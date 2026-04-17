@@ -6,15 +6,16 @@ import { UserNavigationProvider, useUserNavigation } from '../UserNavigationCont
 import SideNavigation from '../navigation/sidenavigation';
 
 function LayoutContent() {
-  const { showMenu, openMenu, closeMenu } = useUserNavigation();
+  const { showMenu, openMenu, closeMenu, toggleMenu } = useUserNavigation();
   const anim = useRef(new Animated.Value(showMenu ? 1 : 0)).current;
 
   useEffect(() => {
+    // Animate whenever showMenu changes
     Animated.spring(anim, {
       toValue: showMenu ? 1 : 0,
       friction: 8,
       tension: 40,
-      useNativeDriver: false,
+      useNativeDriver: false, // Keep false for width animation
     }).start();
   }, [showMenu]);
 
@@ -23,12 +24,22 @@ function LayoutContent() {
     outputRange: [85, 210], 
   });
 
+  // Arrow rotation - points right when collapsed (0), points left when expanded (1)
+  const arrowRotation = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '180deg'],
+  });
 
   const handleToggle = () => {
-    if (showMenu) {
-      closeMenu();
+    // Use toggleMenu if available, otherwise manually toggle
+    if (toggleMenu) {
+      toggleMenu();
     } else {
-      openMenu();
+      if (showMenu) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
     }
   };
 
@@ -39,18 +50,20 @@ function LayoutContent() {
       </Animated.View>
       
       <View style={styles.contentArea}>
-      <TouchableOpacity 
-        activeOpacity={0.8}
-        style={styles.floatingExpandBtn} 
-        onPress={handleToggle}>
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          style={styles.floatingExpandBtn} 
+          onPress={handleToggle}>
 
-      <Icon 
-        name={showMenu ? "chevron-left" : "chevron-right"} 
-        size={24} 
-        color="#FFF"/>
-      </TouchableOpacity>
+          <Animated.View style={{ transform: [{ rotate: arrowRotation }] }}>
+            <Icon 
+              name="chevron-right"
+              size={24} 
+              color="#FFF"/>
+          </Animated.View>
+        </TouchableOpacity>
         
-      <Slot />
+        <Slot />
       </View>
     </View>
   );
@@ -58,38 +71,39 @@ function LayoutContent() {
 
 export default function DashboardLayout() {
   return (
-    <UserNavigationProvider><LayoutContent /></UserNavigationProvider>
+    <UserNavigationProvider>
+      <LayoutContent />
+    </UserNavigationProvider>
   );
 }
 
 const styles = StyleSheet.create({
-layoutContainer: { 
-  flex: 1, 
-  flexDirection: 'row', 
-  backgroundColor: '#FFF' 
-},
+  layoutContainer: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    backgroundColor: '#FFF' 
+  },
 
-contentArea: { 
-  flex: 1, 
-  backgroundColor: '#F8FAFC', 
-  position: 'relative' 
-},
+  contentArea: { 
+    flex: 1, 
+    backgroundColor: '#F8FAFC', 
+    position: 'relative' 
+  },
 
-floatingExpandBtn: {
-  position: 'absolute',
-  top: 380, 
-  left: -13, 
-  zIndex: 999,
-  width: 25,
-  height: 25,
-  backgroundColor: '#10B981',
-  borderRadius: 15,
-  justifyContent: 'center',
-  alignItems: 'center',
-  elevation: 5,
-  shadowColor: '#000',
-  shadowOpacity: 0.2,
-  shadowRadius: 5,
-}
-
+  floatingExpandBtn: {
+    position: 'absolute',
+    top: 380, 
+    left: -13, 
+    zIndex: 999,
+    width: 25,
+    height: 25,
+    backgroundColor: '#10B981',
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  }
 });

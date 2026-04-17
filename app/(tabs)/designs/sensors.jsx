@@ -13,7 +13,7 @@ import {
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 // Central NGROK_URL import
-import { NGROK_URL } from "../../../ngrok_camera";
+import { CAMERA_URL, CAMERA_URL2, NGROK_URL } from "../../../ngrok_camera";
 
 export default function Sensors() {
     const [activeTab, setActiveTab] = useState('Sensors');
@@ -23,6 +23,14 @@ export default function Sensors() {
     const [recentReadings, setRecentReadings] = useState([]);
     const { width } = useWindowDimensions();
     const isSmall = width < 768;
+
+    // Camera states
+    const [cameraKey1, setCameraKey1] = useState(Date.now());
+    const [cameraKey2, setCameraKey2] = useState(Date.now());
+    const [refreshing1, setRefreshing1] = useState(false);
+    const [refreshing2, setRefreshing2] = useState(false);
+    const [cameraConnected1, setCameraConnected1] = useState(true);
+    const [cameraConnected2, setCameraConnected2] = useState(true);
 
     useEffect(() => {
         fetchData();
@@ -132,6 +140,18 @@ export default function Sensors() {
         }
     };
 
+    const handleRefreshCamera1 = () => {
+        setRefreshing1(true);
+        setCameraKey1(Date.now());
+        setTimeout(() => setRefreshing1(false), 500);
+    };
+
+    const handleRefreshCamera2 = () => {
+        setRefreshing2(true);
+        setCameraKey2(Date.now());
+        setTimeout(() => setRefreshing2(false), 500);
+    };
+
     const getAlertLevel = (tempValue, soilValue) => {
         if (tempValue > 38 || tempValue < 5 || soilValue < 20) {
             return { level: 'CRITICAL', color: '#EF4444', icon: 'alert-circle', action: 'Immediate action needed' };
@@ -196,28 +216,63 @@ export default function Sensors() {
                 {activeTab === 'Camera' ? (
                     <View>
                         <View style={[styles.cameraGrid, { flexDirection: isSmall ? 'column' : 'row' }]}>
+                            {/* Camera 1 */}
                             <View style={styles.cameraCard}>
                                 <View style={styles.camHeader}>
-                                    <Text style={styles.camTitle}>Camera 1</Text>
+                                    <View style={styles.camTitleRow}>
+                                        {/* Green/Red status indicator */}
+                                        <View style={[styles.camStatusDot, { backgroundColor: cameraConnected1 ? '#22C55E' : '#EF4444' }]} />
+                                        <Text style={styles.camTitle}>Camera 1</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={handleRefreshCamera1} style={styles.refreshBtn}>
+                                        <Icon name="refresh" size={16} color="#94A3B8" />
+                                    </TouchableOpacity>
                                 </View>
                                 <View style={styles.imageContainer}>
-                                    <Image 
-                                        source={{ uri: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800' }} 
-                                        style={styles.cameraImg} 
-                                        resizeMode="cover"
-                                    />
+                                    {refreshing1 ? (
+                                        <View style={styles.cameraLoading}>
+                                            <ActivityIndicator color="#10B981" />
+                                        </View>
+                                    ) : (
+                                        <Image 
+                                            key={cameraKey1}
+                                            source={{ uri: `${CAMERA_URL}?_=${cameraKey1}`, headers: { 'ngrok-skip-browser-warning': 'true' } }}
+                                            style={styles.cameraImg}
+                                            resizeMode="stretch"
+                                            onError={() => setCameraConnected1(false)}
+                                            onLoad={() => setCameraConnected1(true)}
+                                        />
+                                    )}
                                 </View>
                             </View>
+
+                            {/* Camera 2 */}
                             <View style={styles.cameraCard}>
                                 <View style={styles.camHeader}>
-                                    <Text style={styles.camTitle}>Camera 2</Text>
+                                    <View style={styles.camTitleRow}>
+                                        {/* Green/Red status indicator */}
+                                        <View style={[styles.camStatusDot, { backgroundColor: cameraConnected2 ? '#22C55E' : '#EF4444' }]} />
+                                        <Text style={styles.camTitle}>Camera 2</Text>
+                                    </View>
+                                    <TouchableOpacity onPress={handleRefreshCamera2} style={styles.refreshBtn}>
+                                        <Icon name="refresh" size={16} color="#94A3B8" />
+                                    </TouchableOpacity>
                                 </View>
                                 <View style={styles.imageContainer}>
-                                    <Image 
-                                        source={{ uri: 'https://images.unsplash.com/photo-1592419044706-39796d40f98c?w=800' }} 
-                                        style={styles.cameraImg} 
-                                        resizeMode="cover"
-                                    />
+                                    {refreshing2 ? (
+                                        <View style={styles.cameraLoading}>
+                                            <ActivityIndicator color="#10B981" />
+                                        </View>
+                                    ) : (
+                                        <Image 
+                                            key={cameraKey2}
+                                            source={{ uri: `${CAMERA_URL2}?_=${cameraKey2}`, headers: { 'ngrok-skip-browser-warning': 'true' } }}
+                                            style={styles.cameraImg}
+                                            resizeMode="stretch"
+                                            onError={() => setCameraConnected2(false)}
+                                            onLoad={() => setCameraConnected2(true)}
+                                        />
+                                    )}
                                 </View>
                             </View>
                         </View>
@@ -235,9 +290,8 @@ export default function Sensors() {
                                 <View key={i} style={styles.tableRow}>
                                     <Text style={[styles.td, styles.tdFirst]}>{cam}</Text>
                                     <Text style={[styles.td, styles.tdSecond]}>Video Feed</Text>
-                                    {/* Changed Alert Level to Timestamp */}
                                     <View style={[styles.tdStatus, styles.tdThird]}>
-                                        <Text style={styles.tdTimeText}>12:21 AM</Text>
+                                        <Text style={styles.tdTimeText}>{new Date().toLocaleTimeString()}</Text>
                                     </View>
                                     <View style={[styles.tdStatus, styles.tdFourth]}>
                                         <View style={styles.badge}>
@@ -330,16 +384,31 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between'
     },
     camHeader: { 
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         marginBottom: 12,
         paddingBottom: 8,
         borderBottomWidth: 1,
         borderBottomColor: '#F1F5F9'
     },
+    camTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8
+    },
+    camStatusDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4
+    },
     camTitle: { 
         fontSize: 16, 
         fontWeight: '700', 
-        color: '#1E293B',
-        textAlign: 'center'
+        color: '#1E293B'
+    },
+    refreshBtn: {
+        padding: 4
     },
     imageContainer: {
         width: '100%',
@@ -347,6 +416,13 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         overflow: 'hidden',
         backgroundColor: '#F1F5F9'
+    },
+    cameraLoading: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        height: '100%'
     },
     cameraImg: { 
         width: '100%',

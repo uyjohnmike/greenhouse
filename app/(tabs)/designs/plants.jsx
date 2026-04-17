@@ -93,81 +93,98 @@ const isTimeInRange = (date, startHour, startMinute, endHour, endMinute) => {
 
 // Function to get data for a specific hour with fallback logic
 const getDataForHour = (todayData, targetHour) => {
-    // Define time ranges for each hour
+    // Define time ranges for each hour with primary and fallback
     const hourRanges = {
-        7: { startHour: 7, startMinute: 0, endHour: 7, endMinute: 59 },
-        8: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 59 },
-        9: { startHour: 9, startMinute: 0, endHour: 9, endMinute: 59 },
-        10: { startHour: 10, startMinute: 0, endHour: 10, endMinute: 59 },
-        11: { startHour: 11, startMinute: 0, endHour: 11, endMinute: 59 },
-        12: { startHour: 12, startMinute: 0, endHour: 12, endMinute: 59 },
-        13: { startHour: 13, startMinute: 0, endHour: 13, endMinute: 59 },
-        14: { startHour: 14, startMinute: 0, endHour: 14, endMinute: 59 },
-        15: { startHour: 15, startMinute: 0, endHour: 15, endMinute: 59 },
-        16: { startHour: 16, startMinute: 0, endHour: 16, endMinute: 39 }, // 4:00 PM to 4:39 PM
-        17: { startHour: 16, startMinute: 40, endHour: 17, endMinute: 30 }, // 4:40 PM to 5:30 PM
+        7: { 
+            primary: { startHour: 7, startMinute: 0, endHour: 7, endMinute: 39 },
+            fallback: { startHour: 6, startMinute: 40, endHour: 7, endMinute: 0 }
+        },
+        8: { 
+            primary: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 39 },
+            fallback: { startHour: 7, startMinute: 40, endHour: 8, endMinute: 0 }
+        },
+        9: { 
+            primary: { startHour: 9, startMinute: 0, endHour: 9, endMinute: 39 },
+            fallback: { startHour: 8, startMinute: 40, endHour: 9, endMinute: 0 }
+        },
+        10: { 
+            primary: { startHour: 10, startMinute: 0, endHour: 10, endMinute: 39 },
+            fallback: { startHour: 9, startMinute: 40, endHour: 10, endMinute: 0 }
+        },
+        11: { 
+            primary: { startHour: 11, startMinute: 0, endHour: 11, endMinute: 39 },
+            fallback: { startHour: 10, startMinute: 40, endHour: 11, endMinute: 0 }
+        },
+        12: { 
+            primary: { startHour: 12, startMinute: 0, endHour: 12, endMinute: 39 },
+            fallback: { startHour: 11, startMinute: 40, endHour: 12, endMinute: 0 }
+        },
+        13: { 
+            primary: { startHour: 13, startMinute: 0, endHour: 13, endMinute: 39 },
+            fallback: { startHour: 12, startMinute: 40, endHour: 13, endMinute: 0 }
+        },
+        14: { 
+            primary: { startHour: 14, startMinute: 0, endHour: 14, endMinute: 39 },
+            fallback: { startHour: 13, startMinute: 40, endHour: 14, endMinute: 0 }
+        },
+        15: { 
+            primary: { startHour: 15, startMinute: 0, endHour: 15, endMinute: 39 },
+            fallback: { startHour: 14, startMinute: 40, endHour: 15, endMinute: 0 }
+        },
+        16: { 
+            primary: { startHour: 16, startMinute: 0, endHour: 16, endMinute: 39 },
+            fallback: { startHour: 15, startMinute: 40, endHour: 16, endMinute: 0 }
+        },
+        17: { 
+            primary: { startHour: 16, startMinute: 40, endHour: 17, endMinute: 30 },
+            fallback: { startHour: 16, startMinute: 0, endHour: 16, endMinute: 40 }
+        },
     };
     
-    // For 4:00 PM (hour 16), we need special handling with fallback
-    if (targetHour === 16) {
-        // First try: 4:00 PM to 4:39 PM
-        const primaryData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, 16, 0, 16, 39);
+    const range = hourRanges[targetHour];
+    if (!range) return 0;
+    
+    // First try: primary time range (X:00 to X:39)
+    const primaryData = todayData.filter(item => {
+        const date = new Date(item.created_at);
+        return isTimeInRange(date, 
+            range.primary.startHour, range.primary.startMinute,
+            range.primary.endHour, range.primary.endMinute
+        );
+    });
+    
+    if (primaryData.length > 0) {
+        // Get the most recent data from primary range
+        const bestData = primaryData.reduce((latest, current) => {
+            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
         });
-        
-        if (primaryData.length > 0) {
-            // Get the most recent data from primary range
-            const bestData = primaryData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-        
-        // Second try: 4:00 PM to 3:40 PM (looking back to 3:40 PM)
-        const fallbackData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            // Check if time is between 3:40 PM and 4:00 PM
-            return isTimeInRange(date, 15, 40, 16, 0);
-        });
-        
-        if (fallbackData.length > 0) {
-            // Get the most recent data from fallback range
-            const bestData = fallbackData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-        
-        // No data found - return 0
-        return 0;
+        const total = (parseInt(bestData.unripe) || 0) + 
+                     (parseInt(bestData['semi-ripe']) || 0) + 
+                     (parseInt(bestData.ripe) || 0);
+        return total * 15;
     }
     
-    // For other hours, use standard range
-    if (hourRanges[targetHour]) {
-        const range = hourRanges[targetHour];
-        const hourData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, range.startHour, range.startMinute, range.endHour, range.endMinute);
+    // Second try: fallback time range ((X-1):40 to X:00)
+    const fallbackData = todayData.filter(item => {
+        const date = new Date(item.created_at);
+        return isTimeInRange(date,
+            range.fallback.startHour, range.fallback.startMinute,
+            range.fallback.endHour, range.fallback.endMinute
+        );
+    });
+    
+    if (fallbackData.length > 0) {
+        // Get the most recent data from fallback range
+        const bestData = fallbackData.reduce((latest, current) => {
+            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
         });
-        
-        if (hourData.length > 0) {
-            const bestData = hourData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
+        const total = (parseInt(bestData.unripe) || 0) + 
+                     (parseInt(bestData['semi-ripe']) || 0) + 
+                     (parseInt(bestData.ripe) || 0);
+        return total * 15;
     }
     
+    // No data found - return 0 (will show no data for this hour)
     return 0;
 };
 
@@ -298,10 +315,9 @@ const CustomDatePicker = ({ visible, onClose, onSelectDate, currentDate, availab
     );
 };
 
-// Revenue Insights Component (Modified as per requirements)
+// Revenue Insights Component
 const RevenueInsights = ({ allBellPepperData }) => {
     const insights = useMemo(() => {
-        // Calculate Today's Revenue (based on latest data for today)
         const todayData = allBellPepperData.filter(item => isToday(new Date(item.created_at)));
         let todayRevenue = 0;
         if (todayData.length > 0) {
@@ -314,24 +330,38 @@ const RevenueInsights = ({ allBellPepperData }) => {
             todayRevenue = total * 15;
         }
 
-        // Calculate Daily Revenue (Mode of daily revenues)
-        const dailyRevenues = {};
+        const dailyRevenuesMap = {};
+        
         allBellPepperData.forEach(item => {
             const dateKey = formatDateKey(new Date(item.created_at));
             const total = (parseInt(item.unripe) || 0) + 
                          (parseInt(item['semi-ripe']) || 0) + 
                          (parseInt(item.ripe) || 0);
             const revenue = total * 15;
-            if (!dailyRevenues[dateKey]) dailyRevenues[dateKey] = [];
-            if (revenue > 0) dailyRevenues[dateKey].push(revenue);
+            
+            if (!dailyRevenuesMap[dateKey]) {
+                dailyRevenuesMap[dateKey] = [];
+            }
+            if (revenue > 0) {
+                dailyRevenuesMap[dateKey].push(revenue);
+            }
         });
         
-        const dailyRevenueModes = Object.values(dailyRevenues)
-            .map(revs => calculateMode(revs))
-            .filter(val => val > 0);
-        const dailyMode = dailyRevenueModes.length > 0 ? calculateMode(dailyRevenueModes) : 0;
+        const dailyModeValues = [];
+        Object.values(dailyRevenuesMap).forEach(dayRevenues => {
+            if (dayRevenues.length > 0) {
+                const mode = calculateMode(dayRevenues);
+                if (mode > 0) {
+                    dailyModeValues.push(mode);
+                }
+            }
+        });
+        
+        const dailyMode = dailyModeValues.length > 0 ? calculateMode(dailyModeValues) : 0;
+        const dailyModeSum = dailyModeValues.reduce((sum, val) => sum + val, 0);
+        const numberOfDaysWithData = dailyModeValues.length;
+        const dailyAverage = numberOfDaysWithData > 0 ? dailyModeSum / numberOfDaysWithData : 0;
 
-        // Calculate Weekly Revenue (Mode of weekly revenues)
         const weeklyRevenues = {};
         allBellPepperData.forEach(item => {
             const date = new Date(item.created_at);
@@ -349,26 +379,12 @@ const RevenueInsights = ({ allBellPepperData }) => {
             .filter(val => val > 0);
         const weeklyMode = weeklyRevenueModes.length > 0 ? calculateMode(weeklyRevenueModes) : 0;
 
-        // Calculate Weekly Average Revenue
-        const allRevenues = allBellPepperData
-            .map(item => {
-                const total = (parseInt(item.unripe) || 0) + 
-                             (parseInt(item['semi-ripe']) || 0) + 
-                             (parseInt(item.ripe) || 0);
-                return total * 15;
-            })
-            .filter(val => val > 0);
-        const weeklyAverage = allRevenues.length > 0 ? 
-            allRevenues.reduce((sum, val) => sum + val, 0) / 7 : 0;
-
-        // Calculate Reject Loss Money (based on latest reject count)
         const latestData = allBellPepperData.length > 0 ? 
             allBellPepperData.reduce((latest, current) => 
                 new Date(current.created_at) > new Date(latest.created_at) ? current : latest
             ) : null;
         const rejectLoss = latestData ? (parseInt(latestData.reject) || 0) * 15 : 0;
 
-        // Calculate Active Days
         const uniqueDates = new Set();
         allBellPepperData.forEach(item => {
             uniqueDates.add(formatDateKey(new Date(item.created_at)));
@@ -379,7 +395,7 @@ const RevenueInsights = ({ allBellPepperData }) => {
             todayRevenue,
             dailyMode,
             weeklyMode,
-            weeklyAverage: Math.round(weeklyAverage),
+            dailyAverage: Math.round(dailyAverage),
             rejectLoss,
             activeDays
         };
@@ -412,8 +428,8 @@ const RevenueInsights = ({ allBellPepperData }) => {
             <View style={styles.revenueStatsGrid}>
                 <View style={styles.revenueStatCard}>
                     <Icon name="chart-line" size={16} color="#3B82F6" />
-                    <Text style={styles.revenueStatLabel}>Weekly Avg</Text>
-                    <Text style={styles.revenueStatValue}>₱{insights.weeklyAverage.toLocaleString()}</Text>
+                    <Text style={styles.revenueStatLabel}>Daily Avg</Text>
+                    <Text style={styles.revenueStatValue}>₱{insights.dailyAverage.toLocaleString()}</Text>
                 </View>
                 
                 <View style={styles.revenueStatCard}>
@@ -432,7 +448,7 @@ const RevenueInsights = ({ allBellPepperData }) => {
     );
 };
 
-// --- ANIMATED COMPONENT: CROP HEALTH BAR GRAPH ---
+// CROP HEALTH BAR GRAPH
 const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, allBellPepperData, onStatsUpdate }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const animatedHeights = useRef([]);
@@ -440,7 +456,6 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
 
     const data = useMemo(() => {
         if (activeFilter === 'Today') {
-            // Filter data for today only
             const todayData = allBellPepperData.filter(item => {
                 const date = new Date(item.created_at);
                 return isToday(date);
@@ -452,10 +467,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 let valueInPesos = 0;
                 
                 if (hour === 16) {
-                    // Special handling for 4:00 PM
                     valueInPesos = getDataForHour(todayData, 16);
                 } else if (hour === 17) {
-                    // For 5:00 PM, use range 4:40 PM to 5:30 PM
                     const data5PM = todayData.filter(item => {
                         const date = new Date(item.created_at);
                         return isTimeInRange(date, 16, 40, 17, 30);
@@ -470,7 +483,6 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                         valueInPesos = total * 15;
                     }
                 } else {
-                    // For other hours, use standard hour range
                     const hourData = todayData.filter(item => {
                         const date = new Date(item.created_at);
                         const hours = date.getHours();
@@ -537,8 +549,7 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
 
             const datesWithData = Object.keys(dailyValues)
                 .sort()
-                .reverse()
-                .slice(0, 7);
+                .reverse();
             
             const result = datesWithData.map(dayKey => {
                 const date = new Date(dayKey);
@@ -553,6 +564,10 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                     fullDate: date
                 };
             }).reverse();
+
+            if (result.length === 0) {
+                return [];
+            }
 
             return result.map((item, index) => {
                 if (index === 0) return { ...item, highlight: true };
@@ -1473,9 +1488,12 @@ export default function PlantsDashboard() {
         </View>
     );
 
-    const renderNutrients = () => (
-        <View style={styles.colorindications}>
-            <Text style={styles.sectionTitle}>Nutrients</Text>
+const renderNutrients = () => (
+    <View style={styles.colorindications}>
+        <Text style={styles.sectionTitle}>Nutrients</Text>
+        
+        {/* Nutrient Bars inside white box */}
+        <View style={styles.nutrientsBox}>
             <View style={styles.nutrientsContainer}>
                 {NUTRIENT_DATA.map((item, i) => (
                     <View key={i} style={styles.nutrientRow}>
@@ -1497,26 +1515,161 @@ export default function PlantsDashboard() {
                     </View>
                 ))}
             </View>
+        </View>
 
-            <Text style={styles.tableTitle}>Nitrogen, Phosphorus, Potassium, Soil Humidity Suggestions</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.table}>
-                    <View style={styles.tableHeader}>
-                        <Text style={[styles.tableHeadCell, { width: 150 }]}>Note</Text>
-                        <Text style={styles.tableHeadCell}>Nitrogen (N)</Text>
-                        <Text style={styles.tableHeadCell}>Phosphorus (P)</Text>
-                        <Text style={styles.tableHeadCell}>Potassium (K)</Text>
-                    </View>
-                    {['Low N - apply dose', 'Balanced profile', 'Slight P deficiency'].map((note, i) => (
-                        <View key={i} style={styles.tableRow}>
-                            <Text style={[styles.tableCell, { width: 150 }]}>{note}</Text>
-                            <Text style={styles.tableCell}>75 kg/</Text>
-                            <Text style={styles.tableCell}>45 kg/</Text>
-                            <Text style={styles.tableCell}>35 kg/</Text>
-                        </View>
-                    ))}
+            {/* Soil Quality Monitor - Flexible Table with consistent spacing */}
+            <View style={styles.soilQualityMonitorBox}>
+                <Text style={styles.logTitle}>Soil Quality Monitor</Text>
+                
+                
+                {/* Table Header with consistent spacing */}
+                <View style={styles.tableHead}>
+                    <Text style={[styles.th, styles.thParameter]}>Parameter</Text>
+                    <Text style={[styles.th, styles.thLevel]}>Current Level</Text>
+                    <Text style={[styles.th, styles.thRecommendation]}>Recommendation</Text>
+                    <Text style={[styles.th, styles.thStatus]}>Status</Text>
                 </View>
-            </ScrollView>
+                
+                {/* Nitrogen Row */}
+                <View style={styles.tableRow}>
+                    <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Nitrogen (N)</Text>
+                    <Text style={[styles.td, styles.tdLevel]}>{sensorData.nitrogen.toFixed(0)}%</Text>
+                    <Text style={[styles.td, styles.tdRecommendation]}>
+                        {sensorData.nitrogen < 30 ? 'Apply nitrogen-rich fertilizer' : 
+                         sensorData.nitrogen > 70 ? 'Reduce nitrogen application' : 
+                         'Maintain current levels'}
+                    </Text>
+                    <View style={[styles.tdStatus, styles.tdStatusContainer]}>
+                        <View style={[styles.statusBadge, 
+                            sensorData.nitrogen < 30 ? styles.statusDeficientBadge : 
+                            sensorData.nitrogen > 80 ? styles.statusExcessiveBadge : 
+                            styles.statusOptimalBadge]}>
+                            <Icon 
+                                name={sensorData.nitrogen < 30 ? "alert-circle" : 
+                                      sensorData.nitrogen > 80 ? "trending-up" : 
+                                      "check-circle"} 
+                                size={12} 
+                                color={sensorData.nitrogen < 30 ? "#EF4444" : 
+                                       sensorData.nitrogen > 80 ? "#F59E0B" : 
+                                       "#10B981"} 
+                            />
+                            <Text style={[styles.statusText,
+                                sensorData.nitrogen < 30 ? styles.statusDeficientText : 
+                                sensorData.nitrogen > 80 ? styles.statusExcessiveText : 
+                                styles.statusOptimalText]}>
+                                {sensorData.nitrogen < 30 ? 'Deficient' : 
+                                 sensorData.nitrogen > 80 ? 'Excessive' : 
+                                 'Optimal'}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+                
+                {/* Phosphorus Row */}
+                <View style={styles.tableRow}>
+                    <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Phosphorus (P)</Text>
+                    <Text style={[styles.td, styles.tdLevel]}>{sensorData.phosphorus.toFixed(0)}%</Text>
+                    <Text style={[styles.td, styles.tdRecommendation]}>
+                        {sensorData.phosphorus < 25 ? 'Add bone meal or rock phosphate' : 
+                         sensorData.phosphorus > 60 ? 'Reduce phosphorus input' : 
+                         'Maintain current levels'}
+                    </Text>
+                    <View style={[styles.tdStatus, styles.tdStatusContainer]}>
+                        <View style={[styles.statusBadge,
+                            sensorData.phosphorus < 25 ? styles.statusDeficientBadge : 
+                            sensorData.phosphorus > 70 ? styles.statusExcessiveBadge : 
+                            styles.statusOptimalBadge]}>
+                            <Icon 
+                                name={sensorData.phosphorus < 25 ? "alert-circle" : 
+                                      sensorData.phosphorus > 70 ? "trending-up" : 
+                                      "check-circle"} 
+                                size={12} 
+                                color={sensorData.phosphorus < 25 ? "#EF4444" : 
+                                       sensorData.phosphorus > 70 ? "#F59E0B" : 
+                                       "#10B981"} 
+                            />
+                            <Text style={[styles.statusText,
+                                sensorData.phosphorus < 25 ? styles.statusDeficientText : 
+                                sensorData.phosphorus > 70 ? styles.statusExcessiveText : 
+                                styles.statusOptimalText]}>
+                                {sensorData.phosphorus < 25 ? 'Deficient' : 
+                                 sensorData.phosphorus > 70 ? 'Excessive' : 
+                                 'Optimal'}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+                
+                {/* Potassium Row */}
+                <View style={styles.tableRow}>
+                    <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Potassium (K)</Text>
+                    <Text style={[styles.td, styles.tdLevel]}>{sensorData.potassium.toFixed(0)}%</Text>
+                    <Text style={[styles.td, styles.tdRecommendation]}>
+                        {sensorData.potassium < 35 ? 'Apply potash fertilizer' : 
+                         sensorData.potassium > 65 ? 'Reduce potassium application' : 
+                         'Maintain current levels'}
+                    </Text>
+                    <View style={[styles.tdStatus, styles.tdStatusContainer]}>
+                        <View style={[styles.statusBadge,
+                            sensorData.potassium < 35 ? styles.statusDeficientBadge : 
+                            sensorData.potassium > 75 ? styles.statusExcessiveBadge : 
+                            styles.statusOptimalBadge]}>
+                            <Icon 
+                                name={sensorData.potassium < 35 ? "alert-circle" : 
+                                      sensorData.potassium > 75 ? "trending-up" : 
+                                      "check-circle"} 
+                                size={12} 
+                                color={sensorData.potassium < 35 ? "#EF4444" : 
+                                       sensorData.potassium > 75 ? "#F59E0B" : 
+                                       "#10B981"} 
+                            />
+                            <Text style={[styles.statusText,
+                                sensorData.potassium < 35 ? styles.statusDeficientText : 
+                                sensorData.potassium > 75 ? styles.statusExcessiveText : 
+                                styles.statusOptimalText]}>
+                                {sensorData.potassium < 35 ? 'Deficient' : 
+                                 sensorData.potassium > 75 ? 'Excessive' : 
+                                 'Optimal'}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+                
+                {/* Soil Humidity Row */}
+                <View style={styles.tableRow}>
+                    <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Soil Humidity</Text>
+                    <Text style={[styles.td, styles.tdLevel]}>{sensorData.soilHumidity.toFixed(0)}%</Text>
+                    <Text style={[styles.td, styles.tdRecommendation]}>
+                        {sensorData.soilHumidity < 40 ? 'Increase irrigation frequency' : 
+                         sensorData.soilHumidity > 75 ? 'Improve drainage, reduce watering' : 
+                         'Maintain current watering schedule'}
+                    </Text>
+                    <View style={[styles.tdStatus, styles.tdStatusContainer]}>
+                        <View style={[styles.statusBadge,
+                            sensorData.soilHumidity < 40 ? styles.statusDeficientBadge : 
+                            sensorData.soilHumidity > 90 ? styles.statusExcessiveBadge : 
+                            styles.statusOptimalBadge]}>
+                            <Icon 
+                                name={sensorData.soilHumidity < 40 ? "alert-circle" : 
+                                      sensorData.soilHumidity > 90 ? "trending-up" : 
+                                      "check-circle"} 
+                                size={12} 
+                                color={sensorData.soilHumidity < 40 ? "#EF4444" : 
+                                       sensorData.soilHumidity > 90 ? "#F59E0B" : 
+                                       "#10B981"} 
+                            />
+                            <Text style={[styles.statusText,
+                                sensorData.soilHumidity < 40 ? styles.statusDeficientText : 
+                                sensorData.soilHumidity > 90 ? styles.statusExcessiveText : 
+                                styles.statusOptimalText]}>
+                                {sensorData.soilHumidity < 40 ? 'Dry' : 
+                                 sensorData.soilHumidity > 90 ? 'Waterlogged' : 
+                                 'Optimal'}
+                            </Text>
+                        </View>
+                    </View>
+                </View>
+            </View>
         </View>
     );
 
@@ -1557,7 +1710,7 @@ const styles = StyleSheet.create({
     activeTabText: { color: '#0F172A' },
     sectionHeader: { marginBottom: 20 },
     titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    sectionTitle: { fontSize: 22, fontWeight: '700', color: '#1E293B' },
+    sectionTitle: { fontSize: 22, fontWeight: '700', color: '#1E293B', marginBottom: 10, marginTop: -10 },
     dateSubtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
     datePickerButton: {
         flexDirection: 'row',
@@ -1897,7 +2050,7 @@ const styles = StyleSheet.create({
     miniStat: { alignItems: 'center', flex: 1 },
     miniStatVal: { fontSize: 20, fontWeight: 'bold' },
     miniStatLabel: { fontSize: 11, color: '#94A3B8' },
-    logTitle: { fontSize: 18, fontWeight: '700', marginTop: 20, marginBottom: 12, color: '#1E293B' },
+    logTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12, color: '#1E293B' },
     sortText: { fontSize: 12, color: '#94A3B8', fontWeight: 'normal' },
     logItem: { backgroundColor: '#FFF', padding: 15, borderRadius: 12, marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     logText: { fontWeight: '600', color: '#1E293B' },
@@ -1914,20 +2067,172 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     healthVal: { fontSize: 16, fontWeight: 'bold', color: '#1E293B' },
-    healthLabel: { fontSize: 10, color: '#64748B', textAlign: 'center', marginTop: 4 },
-    nutrientsContainer: { marginVertical: 10 },
-    nutrientRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-    nutrientBar: { height: 40, borderRadius: 8, justifyContent: 'center', paddingLeft: 15, overflow: 'hidden' },
-    nutrientBarLabel: { fontWeight: 'bold', fontSize: 12 },
-    nutrientPercent: { marginLeft: 10, fontWeight: 'bold', color: '#64748B' },
-    tableTitle: { fontSize: 16, fontWeight: '700', marginVertical: 20, color: '#1E293B' },
-    table: { width: 600 },
-    tableHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingBottom: 10 },
-    tableHeadCell: { flex: 1, color: '#94A3B8', fontWeight: 'bold', fontSize: 12 },
-    tableRow: { flexDirection: 'row', paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-    tableCell: { flex: 1, color: '#1E293B', fontSize: 12 },
+    healthLabel: { fontSize: 10,  textAlign: 'center', marginTop: 4 },
+    nutrientsContainer: {
+        marginVertical: 0,
+    },
     
-    // Revenue Insights Styles (Modified)
+    nutrientRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    
+    nutrientBar: {
+        height: 40,
+        borderRadius: 8,
+        justifyContent: 'center',
+        paddingLeft: 15,
+        overflow: 'hidden',
+    },
+    
+    nutrientBarLabel: {
+        fontWeight: 'bold',
+        fontSize: 12,
+    },
+    
+    nutrientPercent: {
+        marginLeft: 10,
+        fontWeight: 'bold',
+        color: '#64748B',
+        minWidth: 45,
+    },   
+    // Soil Quality Monitor Box - Consistent spacing
+    soilQualityMonitorBox: {
+        backgroundColor: '#FFF',
+        borderRadius: 24,
+        paddingLeft: 20,
+        paddingTop: 20,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+        width: '100%',
+    },
+    
+    logSubtitle: {
+        fontSize: 12,
+        color: '#94A3B8',
+        marginBottom: 20,
+    },
+    
+    tableHead: {
+        flexDirection: 'row',
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+        marginBottom: 8,
+    },
+    
+    th: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#94A3B8',
+        textAlign: 'center',
+    },
+    
+    thParameter: {
+        flex: 0.8,
+        textAlign: 'left',
+    },
+    
+    thLevel: {
+        flex: 0.6,
+        textAlign: 'center',
+    },
+    
+    thRecommendation: {
+        flex: 1.5,
+        textAlign: 'left',
+    },
+    
+    thStatus: {
+        flex: 0.7,
+        textAlign: 'center',
+    },
+    
+    tableRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 11,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F8FAFC',
+    },
+    
+    td: {
+        fontSize: 13,
+        color: '#1E293B',
+        fontWeight: '500',
+        textAlign: 'center',
+    },
+    
+    tdParameter: {
+        flex: 0.8,
+        textAlign: 'left',
+    },
+    
+    tdLevel: {
+        flex: 0.6,
+        textAlign: 'center',
+    },
+    
+    tdRecommendation: {
+        flex: 1.5,
+        textAlign: 'left',
+        fontSize: 12,
+        lineHeight: 16,
+    },
+    
+    tdStatus: {
+        flex: 0.7,
+        alignItems: 'center',
+    },
+    
+    tdStatusContainer: {
+        alignItems: 'center',
+    },
+    
+    cellBold: {
+        fontWeight: '600',
+    },
+    
+    statusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    
+    statusDeficientBadge: {
+        backgroundColor: '#FEE2E2',
+    },
+    
+    statusExcessiveBadge: {
+        backgroundColor: '#FEF3C7',
+    },
+    
+    statusOptimalBadge: {
+        backgroundColor: '#F0FDF4',
+    },
+    
+    statusText: {
+        fontSize: 11,
+        fontWeight: '800',
+    },
+    
+    statusDeficientText: {
+        color: '#EF4444',
+    },
+    
+    statusExcessiveText: {
+        color: '#F59E0B',
+    },
+    
+    statusOptimalText: {
+        color: '#10B981',
+    },
+    
     revenueInsightsContainer: {
         backgroundColor: '#FFF',
         borderRadius: 20,
@@ -1948,9 +2253,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
         marginBottom: 12,
+        flexWrap: 'wrap',
     },
     revenueStatCard: {
         flex: 1,
+        minWidth: 100,
         backgroundColor: '#F1F5F9',
         borderRadius: 12,
         padding: 12,
@@ -1967,4 +2274,14 @@ const styles = StyleSheet.create({
         fontWeight: '800',
         color: '#1E293B',
     },
+    nutrientsBox: {
+        backgroundColor: '#FFF',
+        borderRadius: 24,
+        padding: 20,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#F1F5F9',
+        width: '100%',
+    },
+    
 });

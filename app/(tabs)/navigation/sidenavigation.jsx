@@ -1,18 +1,27 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react'; // Added useEffect
-import { Animated, StyleSheet, TouchableOpacity, View, useWindowDimensions } from 'react-native'; // Added useWindowDimensions
+import { useEffect, useState } from 'react';
+import {
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  useWindowDimensions
+} from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useUserNavigation } from '../UserNavigationContext';
 
 const SideNavigation = ({ animatedValue }) => {
   const router = useRouter();
-  const { width } = useWindowDimensions(); // Get current window width
+  const { width } = useWindowDimensions();
   const { activeTab, setActiveTab } = useUserNavigation();
   const [hoveredItem, setHoveredItem] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   // --- AUTO COLLAPSE LOGIC ---
   useEffect(() => {
-    // Threshold: 1000 pixels (standard for tablets/small desktops)
     const shouldCollapse = width < 1000; 
     
     Animated.timing(animatedValue, {
@@ -20,8 +29,7 @@ const SideNavigation = ({ animatedValue }) => {
       duration: 300,
       useNativeDriver: false,
     }).start();
-  }, [width]); // Re-runs whenever the window is resized
-  // ---------------------------
+  }, [width]);
 
   const contentOpacity = animatedValue.interpolate({
     inputRange: [0, 0.8, 1],
@@ -42,59 +50,148 @@ const SideNavigation = ({ animatedValue }) => {
     router.push(item.path);
   };
 
+  const handleLogout = () => {
+    setShowLogoutModal(false);
+    
+    // Reset active tab to Dashboard
+    setActiveTab('Dashboard');
+    
+    // Clear any user data/storage if needed
+    // Example: AsyncStorage.removeItem('userToken');
+    // Example: AsyncStorage.removeItem('userData');
+    
+    // Replace the entire navigation history with the login page
+    router.replace('/(tabs)');
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutModal(false);
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.logoBox}>
-          <Icon name="leaf" size={20} color="#FFF" />
+    <>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.logoBox}>
+            <Icon name="leaf" size={20} color="#FFF" />
+          </View>
+          <Animated.Text style={[styles.logoText, { opacity: contentOpacity }]}>GREENHOUSE</Animated.Text>
         </View>
-        <Animated.Text style={[styles.logoText, { opacity: contentOpacity }]}>GREENHOUSE</Animated.Text>
+
+        <View style={styles.navSection}>
+          {menuItems.map((item) => {
+            const isActive = activeTab === item.label;
+            const isHovered = hoveredItem === item.label;
+
+            return (
+              <TouchableOpacity
+                key={item.label}
+                onPress={() => handleNavigation(item)}
+                onMouseEnter={() => setHoveredItem(item.label)}
+                onMouseLeave={() => setHoveredItem(null)}
+                activeOpacity={0.7}
+                style={[
+                  styles.navItem,
+                  isActive && styles.activeItem,
+                  !isActive && isHovered && styles.hoverItem
+                ]}>
+
+                <View style={styles.iconContainer}>
+                  <Icon 
+                    name={isActive ? item.icon.replace('-outline', '') : item.icon} 
+                    size={22} 
+                    color={isActive ? '#10B981' : '#94A3B8'}
+                  />
+                </View>
+
+                <Animated.Text 
+                  numberOfLines={1} 
+                  style={[
+                    styles.navText, 
+                    isActive && styles.activeText, 
+                    { opacity: contentOpacity }
+                  ]}
+                >
+                  {item.label}
+                </Animated.Text>
+                      
+                {isActive && <View style={styles.activeIndicator} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={styles.logoutBtn} 
+            onPress={() => setShowLogoutModal(true)}
+          >
+            <View style={styles.iconContainer}>
+              <Icon name="logout-variant" size={22} color="#F87171" />
+            </View>
+            <Animated.Text style={[styles.logoutText, { opacity: contentOpacity }]}>
+              Logout
+            </Animated.Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.navSection}>
-        {menuItems.map((item) => {
-          const isActive = activeTab === item.label;
-          const isHovered = hoveredItem === item.label;
-
-          return (
-            <TouchableOpacity
-              key={item.label}
-              onPress={() => handleNavigation(item)}
-              onMouseEnter={() => setHoveredItem(item.label)}
-              onMouseLeave={() => setHoveredItem(null)}
-              activeOpacity={0.7}
-              style={[
-                styles.navItem,
-                isActive && styles.activeItem,
-                !isActive && isHovered && styles.hoverItem
-              ]}>
-
-              <View style={styles.iconContainer}>
-                <Icon name={isActive ? item.icon.replace('-outline', '') : item.icon} size={22} color={isActive ? '#10B981' : '#94A3B8'}/>
+      {/* Beautiful Logout Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showLogoutModal}
+        onRequestClose={handleCancelLogout}
+      >
+        <Pressable style={styles.modalOverlay} onPress={handleCancelLogout}>
+          <View style={styles.modalContainer}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              {/* Animated Icon */}
+              <View style={styles.modalIconContainer}>
+                <View style={styles.iconCircle}>
+                  <Icon name="logout-variant" size={50} color="#F87171" />
+                </View>
               </View>
 
-              <Animated.Text numberOfLines={1} 
-                style={[styles.navText, isActive && styles.activeText, { opacity: contentOpacity }]}>
-                {item.label}
-              </Animated.Text>
-                    
-              {isActive && <View style={styles.activeIndicator} />}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+              {/* Title */}
+              <Text style={styles.modalTitle}>Logout Confirmation</Text>
+              
+              {/* Message */}
+              <Text style={styles.modalMessage}>
+                Are you sure you want to logout from your account? You will need to login again to access your dashboard.
+              </Text>
 
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.logoutBtn} onPress={() => router.replace('/(tabs)')}>
-          <View style={styles.iconContainer}>
-            <Icon name="logout-variant" size={22} color="#F87171" />
+              {/* Buttons */}
+              <View style={styles.modalButtons}>
+                <Pressable 
+                  style={({ pressed }) => [
+                    styles.modalButton,
+                    styles.cancelButton,
+                    pressed && styles.buttonPressed
+                  ]} 
+                  onPress={handleCancelLogout}
+                >
+                  <Icon name="close" size={20} color="#64748B" />
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
+
+                <Pressable 
+                  style={({ pressed }) => [
+                    styles.modalButton,
+                    styles.confirmButton,
+                    pressed && styles.buttonPressed
+                  ]} 
+                  onPress={handleLogout}
+                >
+                  <Icon name="check" size={20} color="#FFF" />
+                  <Text style={styles.confirmButtonText}>Yes, Logout</Text>
+                </Pressable>
+              </View>
+            </Pressable>
           </View>
-          <Animated.Text style={[styles.logoutText, { opacity: contentOpacity }]}>
-            Logout
-          </Animated.Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+        </Pressable>
+      </Modal>
+    </>
   );
 };
 
@@ -166,6 +263,7 @@ const styles = StyleSheet.create({
   },
   activeText: {
     color: '#059669',
+    fontWeight: '700',
   },
   activeIndicator: {
     position: 'absolute',
@@ -193,6 +291,103 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 15,
     marginLeft: 8,
+  },
+  
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '90%',
+    maxWidth: 400,
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    marginBottom: 20,
+  },
+  iconCircle: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FECACA',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 15,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 28,
+    paddingHorizontal: 8,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  confirmButton: {
+    backgroundColor: '#EF4444',
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  cancelButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  confirmButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
 });
 

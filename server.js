@@ -14,11 +14,14 @@ import getallbellpeppercountRoutes from "./API/getallbellpeppercount.js";
 import logRoutes from "./API/getalllogs.js";
 import getallnpkRoutes from "./API/getallnpk.js";
 import getallpestlogsRoutes from "./API/getallpestlogs.js";
+import getallsensorlogsRoutes from "./API/getallsensorlogs.js";
 import getallsoilhumidityRoutes from "./API/getallsoilhumidity.js";
 import metricsRoute from './API/getalltemperature.js';
 import getallusersRoutes from "./API/getallusers.js";
 import getallwaterlevelRoutes from "./API/getallwaterlevel.js";
 import loginRoutes from "./API/login.js";
+import updateprofileRoutes from "./API/updateprofile.js";
+import updateuserRoutes from "./API/updateuser.js";
 
 const app = express();
 
@@ -35,6 +38,9 @@ app.use('/api', getallnpkRoutes);
 app.use('/api', getallwaterlevelRoutes);
 app.use('/api', getallbellpeppercountRoutes);
 app.use('/api', getallpestlogsRoutes);
+app.use('/api', getallsensorlogsRoutes);
+app.use('/api', updateuserRoutes);
+app.use('/api', updateprofileRoutes);
 
 
 app.get("/", (req, res) => {

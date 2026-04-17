@@ -581,11 +581,12 @@ const Dashboard = () => {
     const [dailyInsects, setDailyInsects] = useState([]);
     
     // Camera States
-    const [activeCamera, setActiveCamera] = useState(NGROK_URL);
+    const [activeCamera, setActiveCamera] = useState(CAMERA_URL); // Start with Camera 1 directly
     const [cameraMenuVisible, setCameraMenuVisible] = useState(false);
     const [camLabel, setCamLabel] = useState("Cam 1");
     const [refreshingCamera, setRefreshingCamera] = useState(false);
     const [cameraKey, setCameraKey] = useState(Date.now());
+    const [cameraConnected, setCameraConnected] = useState(true); // Track camera connection status
 
     const [latestMetrics, setLatestMetrics] = useState({ 
         temp: "--", humidity: "--", soilHumidity: "--", npk: "--/--/--", waterLevel: "--",
@@ -1298,6 +1299,15 @@ const Dashboard = () => {
         setTimeout(() => setRefreshingCamera(false), 500);
     };
 
+    // Handle image load error to update connection status
+    const handleCameraError = () => {
+        setCameraConnected(false);
+    };
+
+    const handleCameraLoad = () => {
+        setCameraConnected(true);
+    };
+
     const MainContent = React.useMemo(() => (
         <>
             <View style={[styles.topHeader, { paddingHorizontal: isVerySmall ? 10 : 15, paddingTop: isVerySmall ? 10 : 15 }]}>
@@ -1330,7 +1340,8 @@ const Dashboard = () => {
                     <View style={[styles.card, styles.cameraBox, { minHeight: isVerySmall ? 180 : isSmall ? 220 : 260, padding: isVerySmall ? 10 : 14 }]}>
                         <View style={styles.bentoHeader}>
                             <View style={styles.titleWithIcon}>
-                                <View style={styles.livePulse} />
+                                {/* Status indicator - Green when connected, Red when disconnected */}
+                                <View style={[styles.livePulse, { backgroundColor: cameraConnected ? '#22C55E' : '#EF4444' }]} />
                                 <Text style={[styles.bentoTitle, { fontSize: isVerySmall ? 13 : 15 }]}>Live Feed: {camLabel}</Text>
                             </View>
                             
@@ -1353,8 +1364,9 @@ const Dashboard = () => {
                             <Image 
                                 key={cameraKey} 
                                 source={{ uri: `${activeCamera}?_=${cameraKey}`, headers: { 'ngrok-skip-browser-warning': 'true' } }} 
-                                style={[styles.cameraFeed, { minHeight: isVerySmall ? 120 : 150 }]} 
-                                resizeMode="cover" 
+                                style={[styles.cameraFeed, { minHeight: isVerySmall ? 120 : 150, width: '100%', resizeMode: 'stretch' }]}
+                                onError={handleCameraError}
+                                onLoad={handleCameraLoad}
                             />
                         )}
 
@@ -1383,7 +1395,7 @@ const Dashboard = () => {
                     </View>
                 </View>
 
-                <View style={[styles.rightCol, { width: isSmall ? '100%' : '1', flex: isSmall ? undefined : 1, gap: 12 }]}>
+                <View style={[styles.rightCol, { width: isSmall ? '100%' : '1', flex: isSmall ? undefined : 1, gap: 12, maxHeight: isSmall ? 620 : 'none' }]}>
                     <View style={[styles.card, styles.detectionCard, { padding: isVerySmall ? 10 : 15 }]}>
                         <View style={styles.detectionHeader}>
                             <Text style={[styles.detectionTitle, { fontSize: isVerySmall ? 12 : 14 }]}>Detection Analytics</Text>
@@ -1507,7 +1519,7 @@ const Dashboard = () => {
         isVerySmall, isSmall, currentTime, latestMetrics, trends, 
         detections, allBellPepperData, windowWidth, logs, loadingLogs, 
         menuVisible, cameraKey, activeCamera, camLabel, refreshingCamera,
-        cameraMenuVisible, hoveredLogIndex
+        cameraMenuVisible, hoveredLogIndex, cameraConnected
     ]);
 
     return (
@@ -1711,7 +1723,7 @@ const styles = StyleSheet.create({
     cropsBox: { flex: 1, minHeight: 280 },
     bentoHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     bentoTitle: { fontWeight: '700', color: '#1E293B' },
-    livePulse: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#22C55E', marginRight: 6 },
+    livePulse: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
     titleWithIcon: { flexDirection: 'row', alignItems: 'center' },
     cameraFeed: { flex: 1, width: '100%', borderRadius: 12, backgroundColor: '#F1F5F9', minHeight: 150 },
     
@@ -1735,7 +1747,7 @@ const styles = StyleSheet.create({
     cropXAxis: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8, marginBottom: -10 },
     cropXAxisText: { color: '#94A3B8', textAlign: 'center' },
     cropStatsRow: { flexDirection: 'row', gap: 8, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-    cropStatBox: { flex: 1, backgroundColor: '#F8FAFC', paddingVertical: 6, borderRadius: 8, alignItems: 'center' },
+    cropStatBox: { flex: 1, backgroundColor: '#F8FAFC', paddingVertical: 6, borderRadius: 8, alignItems: 'center', marginBottom: 100, },
     cropStatValue: { fontWeight: '800', color: '#1E293B' },
     cropStatLabel: { color: '#94A3B8', fontWeight: '600', marginTop: 2 },
     noDataContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 30 },
