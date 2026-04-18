@@ -222,13 +222,19 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                 return {
                     label: isSmall ? (hour === 12 ? '12P' : label.replace('AM', '').replace('PM', '')) : label,
                     value: valueInPesos,
-                    hour
+                    hour,
+                    hasData: valueInPesos > 0  // Mark if this hour has data
                 };
             });
 
-            return result.map((item, index) => {
+            // FILTER: Only show hours that have data (value > 0)
+            const filteredResult = result.filter(item => item.hasData);
+            
+            if (filteredResult.length === 0) return [];
+
+            return filteredResult.map((item, index) => {
                 if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                const prevValue = filteredResult[index - 1].value;
                 const currentValue = item.value;
                 const highlight = currentValue > prevValue;
                 return { ...item, highlight };
@@ -269,7 +275,8 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                     label: isSmall ? monthDay.substring(0, 3) : monthDay,
                     value: modeValue,
                     dayKey,
-                    fullDate: date
+                    fullDate: date,
+                    hasData: modeValue > 0
                 };
             }).reverse();
 
@@ -337,7 +344,8 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                     value: modeValue,
                     weekKey: weekKey,
                     weekNumber: weekInfo.weekNumber,
-                    year: weekInfo.year
+                    year: weekInfo.year,
+                    hasData: modeValue > 0
                 });
             });
 
@@ -468,6 +476,45 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                 <View style={styles.noDataContainer}>
                     <Icon name="chart-line" size={40} color="#CBD5E1" />
                     <Text style={styles.noDataText}>No weekly data available</Text>
+                </View>
+            </View>
+        );
+    }
+
+    // If no data for Today view, show message
+    if (activeFilter === 'Today' && data.length === 0) {
+        return (
+            <View>
+                <View style={styles.cropHealthHeader}>
+                    <Text style={styles.cropHealthTitle}>Crop Health</Text>
+                    <View ref={dropdownRef}>
+                        <TouchableOpacity 
+                            style={styles.cropDropdownMini} 
+                            onPress={() => setShowDropdown(!showDropdown)}
+                        >
+                            <Text style={styles.cropDropdownText}>{activeFilter}</Text>
+                            <Icon name="chevron-down" size={14} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {showDropdown && (
+                            <View style={[styles.cropDropdownMenu, { right: isSmall ? -10 : 0 }]}>
+                                {['Today', 'Daily', 'Weekly'].map(f => (
+                                    <TouchableOpacity 
+                                        key={f} 
+                                        style={styles.cropDropdownItem} 
+                                        onPress={() => handleFilterChange(f)}
+                                    >
+                                        <Text style={[styles.cropDropdownItemText, activeFilter === f && {color: '#10B981'}]}>{f}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+                <View style={styles.noDataContainer}>
+                    <Icon name="calendar-blank" size={40} color="#CBD5E1" />
+                    <Text style={styles.noDataText}>No data available for today</Text>
+                    <Text style={styles.noDataSubtext}>No readings recorded between 7AM - 5PM</Text>
                 </View>
             </View>
         );
@@ -1752,6 +1799,7 @@ const styles = StyleSheet.create({
     cropStatLabel: { color: '#94A3B8', fontWeight: '600', marginTop: 2 },
     noDataContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 30 },
     noDataText: { marginTop: 10, color: '#94A3B8', fontSize: 12, fontWeight: '500' },
+    noDataSubtext: { marginTop: 4, color: '#CBD5E1', fontSize: 10, fontWeight: '400' },
     
     detectionCard: { flex: 1 },
     detectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 },

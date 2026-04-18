@@ -14,7 +14,7 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native';
-import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { NGROK_URL } from "../../../ngrok_camera";
 
@@ -93,7 +93,6 @@ const isTimeInRange = (date, startHour, startMinute, endHour, endMinute) => {
 
 // Function to get data for a specific hour with fallback logic
 const getDataForHour = (todayData, targetHour) => {
-    // Define time ranges for each hour with primary and fallback
     const hourRanges = {
         7: { 
             primary: { startHour: 7, startMinute: 0, endHour: 7, endMinute: 39 },
@@ -144,7 +143,6 @@ const getDataForHour = (todayData, targetHour) => {
     const range = hourRanges[targetHour];
     if (!range) return 0;
     
-    // First try: primary time range (X:00 to X:39)
     const primaryData = todayData.filter(item => {
         const date = new Date(item.created_at);
         return isTimeInRange(date, 
@@ -154,7 +152,6 @@ const getDataForHour = (todayData, targetHour) => {
     });
     
     if (primaryData.length > 0) {
-        // Get the most recent data from primary range
         const bestData = primaryData.reduce((latest, current) => {
             return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
         });
@@ -164,7 +161,6 @@ const getDataForHour = (todayData, targetHour) => {
         return total * 15;
     }
     
-    // Second try: fallback time range ((X-1):40 to X:00)
     const fallbackData = todayData.filter(item => {
         const date = new Date(item.created_at);
         return isTimeInRange(date,
@@ -174,7 +170,6 @@ const getDataForHour = (todayData, targetHour) => {
     });
     
     if (fallbackData.length > 0) {
-        // Get the most recent data from fallback range
         const bestData = fallbackData.reduce((latest, current) => {
             return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
         });
@@ -184,7 +179,6 @@ const getDataForHour = (todayData, targetHour) => {
         return total * 15;
     }
     
-    // No data found - return 0 (will show no data for this hour)
     return 0;
 };
 
@@ -448,7 +442,7 @@ const RevenueInsights = ({ allBellPepperData }) => {
     );
 };
 
-// CROP HEALTH BAR GRAPH
+// CROP HEALTH BAR GRAPH - MODIFIED TO ONLY SHOW HOURS WITH DATA FOR DAILY FILTER
 const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, allBellPepperData, onStatsUpdate }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const animatedHeights = useRef([]);
@@ -515,13 +509,19 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 return {
                     label,
                     value: valueInPesos,
-                    hour
+                    hour,
+                    hasData: valueInPesos > 0
                 };
             });
 
-            return result.map((item, index) => {
+            // Filter out hours with no data for Today view
+            const filteredResult = result.filter(item => item.hasData);
+            
+            if (filteredResult.length === 0) return [];
+            
+            return filteredResult.map((item, index) => {
                 if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                const prevValue = filteredResult[index - 1].value;
                 const currentValue = item.value;
                 const highlight = currentValue > prevValue;
                 return { ...item, highlight };
@@ -561,7 +561,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                     label: monthDay,
                     value: modeValue,
                     dayKey,
-                    fullDate: date
+                    fullDate: date,
+                    hasData: modeValue > 0
                 };
             }).reverse();
 
@@ -569,6 +570,7 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 return [];
             }
 
+            // For Daily view, show all dates (they all have data by definition)
             return result.map((item, index) => {
                 if (index === 0) return { ...item, highlight: true };
                 const prevValue = result[index - 1].value;
@@ -608,7 +610,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 
                 return {
                     label: weekKey,
-                    value: modeValue
+                    value: modeValue,
+                    hasData: modeValue > 0
                 };
             });
 
@@ -729,7 +732,7 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
 
     const currentDateString = getCurrentDateString();
 
-    if (activeFilter === 'Weekly' && data.length === 0) {
+    if (data.length === 0) {
         return (
             <View style={styles.barGraphContainer}>
                 <View style={styles.barGraphHeader}>
@@ -762,8 +765,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 </View>
                 <View style={styles.noDataContainer}>
                     <Icon name="chart-line" size={48} color="#CBD5E1" />
-                    <Text style={styles.noDataText}>No weekly data available</Text>
-                    <Text style={styles.noDataSubtext}>No data found for any week</Text>
+                    <Text style={styles.noDataText}>No data available</Text>
+                    <Text style={styles.noDataSubtext}>No data found for the selected period</Text>
                 </View>
             </View>
         );
@@ -775,8 +778,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 <View>
                     <Text style={styles.graphTitleText}>Crop Health Revenue</Text>
                     <Text style={styles.graphSubText}>
-                        {activeFilter === 'Today' ? currentDateString : 
-                         activeFilter === 'Daily' ? 'Daily Mode Values (₱) - Last 7 Days With Data' : 
+                        {activeFilter === 'Today' ? `${currentDateString} - Hours with Data` : 
+                         activeFilter === 'Daily' ? 'Daily Mode Values (₱) - Days With Data' : 
                          'Revenue Analysis (₱) - Weeks With Data'}
                     </Text>
                 </View>
@@ -847,6 +850,533 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
     );
 };
 
+// Nutrient Graph Modal Component - WITH GRADIENT FILL AREA (FIXED SHADOW COLOR)
+const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allSensorData }) => {
+    const [chartLayout, setChartLayout] = useState({ width: 600, height: 400 });
+    const [hoverData, setHoverData] = useState(null);
+    const drawAnim = useRef(new Animated.Value(0)).current;
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [availableDates, setAvailableDates] = useState([]);
+    const [filteredData, setFilteredData] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const GRAPH_HEIGHT = 320;
+    const TOP_PADDING = 20;
+    const BOTTOM_PADDING = 40;
+    const LEFT_MARGIN = 55;
+    const RIGHT_MARGIN = 25;
+    const START_HOUR = 7;
+    const END_HOUR = 17;
+    const TOTAL_HOURS_VISIBLE = END_HOUR - START_HOUR;
+
+    const TIME_LABELS = [
+        { label: "7AM", hr: 7 }, { label: "8AM", hr: 8 }, { label: "9AM", hr: 9 },
+        { label: "10AM", hr: 10 }, { label: "11AM", hr: 11 }, { label: "12PM", hr: 12 },
+        { label: "1PM", hr: 13 }, { label: "2PM", hr: 14 }, { label: "3PM", hr: 15 },
+        { label: "4PM", hr: 16 }, { label: "5PM", hr: 17 },
+    ];
+
+    const getNutrientColor = () => {
+        switch (nutrientType) {
+            case 'NITROGEN': return '#22C55E';
+            case 'PHOSPHORUS': return '#2D2D2D';
+            case 'POTASSIUM': return '#22C55E';
+            case 'SOIL HUMIDITY': return '#2D2D2D';
+            default: return '#6366F1';
+        }
+    };
+
+    // Helper function to get a lighter version of the color for gradient
+    const getGradientColor = () => {
+        const color = getNutrientColor();
+        // For dark colors like #2D2D2D, we need a lighter gradient
+        if (color === '#2D2D2D') {
+            return '#64748B'; // Lighter gray for gradient
+        }
+        return color;
+    };
+
+    const getNutrientIcon = () => {
+        switch (nutrientType) {
+            case 'NITROGEN': return 'leaf';
+            case 'PHOSPHORUS': return 'flower';
+            case 'POTASSIUM': return 'seed';
+            case 'SOIL HUMIDITY': return 'water-percent';
+            default: return 'chart-line';
+        }
+    };
+
+    const getNutrientKey = () => {
+        switch (nutrientType) {
+            case 'NITROGEN': return 'nitrogen';
+            case 'PHOSPHORUS': return 'phosphorus';
+            case 'POTASSIUM': return 'potassium';
+            case 'SOIL HUMIDITY': return 'soilaverage';
+            default: return '';
+        }
+    };
+
+    const fetchNutrientHistory = async (date) => {
+        setLoading(true);
+        try {
+            let endpoint = '';
+            const nutrientKey = getNutrientKey();
+            
+            if (nutrientType === 'SOIL HUMIDITY') {
+                endpoint = `${NGROK_URL}/api/getallsoilhumidity`;
+            } else {
+                endpoint = `${NGROK_URL}/api/getallnpk`;
+            }
+            
+            const response = await fetch(endpoint, { 
+                headers: { 'ngrok-skip-browser-warning': 'true' } 
+            });
+            const data = await response.json();
+            
+            const filtered = data.filter(item => {
+                const itemDate = new Date(item.created_at);
+                const hours = itemDate.getHours();
+                const isSameDate = itemDate.getDate() === date.getDate() &&
+                                  itemDate.getMonth() === date.getMonth() &&
+                                  itemDate.getFullYear() === date.getFullYear();
+                return isSameDate && hours >= START_HOUR && hours <= END_HOUR;
+            }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+            
+            setFilteredData(filtered);
+            
+            const datesWithData = new Set();
+            data.forEach(item => {
+                const itemDate = new Date(item.created_at);
+                const dateStr = formatDateKey(itemDate);
+                datesWithData.add(dateStr);
+            });
+            setAvailableDates(Array.from(datesWithData));
+            
+            drawAnim.setValue(0);
+            Animated.timing(drawAnim, { toValue: 1, duration: 800, useNativeDriver: false }).start();
+        } catch (error) {
+            console.error("Error fetching nutrient history:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (visible) {
+            fetchNutrientHistory(selectedDate);
+        }
+    }, [visible, selectedDate, nutrientType]);
+
+    const handleDateSelect = (date) => {
+        setSelectedDate(date);
+        setShowDatePicker(false);
+    };
+
+    const formatTimeForDisplay = (dateString) => {
+        const date = new Date(dateString);
+        let hours = date.getHours();
+        const minutes = date.getMinutes();
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutesStr = minutes < 10 ? `0${minutes}` : minutes;
+        return `${hours}:${minutesStr}${ampm}`;
+    };
+
+    const getCoordinateX = (hourVal, width) => {
+        const usableWidth = width - (LEFT_MARGIN + RIGHT_MARGIN);
+        const progress = (hourVal - START_HOUR) / TOTAL_HOURS_VISIBLE;
+        return LEFT_MARGIN + (progress * usableWidth);
+    };
+
+    const getYPos = (val, maxVal) => {
+        return TOP_PADDING + (GRAPH_HEIGHT - (parseFloat(val) / maxVal) * GRAPH_HEIGHT);
+    };
+
+    const handleHover = (evt) => {
+        const width = chartLayout.width;
+        const xPos = Platform.OS === 'web' ? evt.nativeEvent.offsetX : evt.nativeEvent.locationX;
+        let closest = null;
+        let minDiff = Infinity;
+        const nutrientKey = getNutrientKey();
+
+        filteredData.forEach(d => {
+            const date = new Date(d.created_at);
+            const h = date.getHours() + (date.getMinutes() / 60);
+            const x = getCoordinateX(h, width);
+            const diff = Math.abs(xPos - x);
+            if (diff < minDiff && diff < 40) {
+                minDiff = diff;
+                closest = { ...d, nutrientKey };
+            }
+        });
+        setHoverData(closest);
+    };
+
+    const createSmoothPathData = (points) => {
+        if (points.length === 0) return "";
+        if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
+        if (points.length === 2) {
+            return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+        }
+
+        let path = `M ${points[0].x} ${points[0].y}`;
+        
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[i === 0 ? i : i - 1];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[i + 2] || p2;
+            
+            const tension = 0.3;
+            
+            const cp1x = p1.x + (p2.x - p0.x) * tension;
+            const cp1y = p1.y + (p2.y - p0.y) * tension;
+            const cp2x = p2.x - (p3.x - p1.x) * tension;
+            const cp2y = p2.y - (p3.y - p1.y) * tension;
+            
+            path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+        }
+        
+        return path;
+    };
+
+    const renderChart = () => {
+        const nutrientKey = getNutrientKey();
+        const maxVal = 100;
+        const yLabels = [0, 20, 40, 60, 80, 100];
+        const color = getNutrientColor();
+        const gradientColor = getGradientColor();
+        
+        const points = filteredData.map(d => {
+            const date = new Date(d.created_at);
+            const h = date.getHours() + (date.getMinutes() / 60);
+            let value = 0;
+            if (nutrientType === 'SOIL HUMIDITY') {
+                value = parseFloat(d.soilaverage) || 0;
+            } else {
+                value = parseFloat(d[nutrientKey]) || 0;
+            }
+            return { 
+                x: getCoordinateX(h, chartLayout.width), 
+                y: getYPos(value, maxVal),
+                value: value
+            };
+        });
+        
+        // Build path string for the filled area (goes from line down to bottom, then back to start)
+        let fillPathString = "";
+        if (points.length > 0) {
+            fillPathString = `M ${points[0].x} ${points[0].y}`;
+            for (let i = 1; i < points.length; i++) {
+                fillPathString += ` L ${points[i].x} ${points[i].y}`;
+            }
+            // Add bottom line and close
+            fillPathString += ` L ${points[points.length - 1].x} ${GRAPH_HEIGHT + TOP_PADDING}`;
+            fillPathString += ` L ${points[0].x} ${GRAPH_HEIGHT + TOP_PADDING} Z`;
+        }
+        
+        // Create smooth path for the line only
+        const smoothPathData = createSmoothPathData(points);
+        
+        const latestValue = filteredData.length > 0 ? 
+            (nutrientType === 'SOIL HUMIDITY' ? 
+                parseFloat(filteredData[filteredData.length - 1].soilaverage).toFixed(1) :
+                parseFloat(filteredData[filteredData.length - 1][nutrientKey]).toFixed(1)) : '--';
+        
+        const avgValue = filteredData.length > 0 ? 
+            (filteredData.reduce((sum, d) => {
+                const val = nutrientType === 'SOIL HUMIDITY' ? 
+                    parseFloat(d.soilaverage) : parseFloat(d[nutrientKey]);
+                return sum + (val || 0);
+            }, 0) / filteredData.length).toFixed(1) : '--';
+        
+        const maxValue = filteredData.length > 0 ? 
+            Math.max(...filteredData.map(d => 
+                nutrientType === 'SOIL HUMIDITY' ? 
+                    parseFloat(d.soilaverage) || 0 : parseFloat(d[nutrientKey]) || 0
+            )).toFixed(1) : '--';
+        
+        const minValue = filteredData.length > 0 ? 
+            Math.min(...filteredData.map(d => 
+                nutrientType === 'SOIL HUMIDITY' ? 
+                    parseFloat(d.soilaverage) || 0 : parseFloat(d[nutrientKey]) || 0
+            )).toFixed(1) : '--';
+
+        // Create gradient ID based on nutrient type
+        const gradientId = `nutrientGrad${nutrientType?.replace(/\s/g, '') || 'default'}`;
+
+        return (
+            <View style={styles.nutrientModalContainer}>
+                <View style={styles.nutrientModalHeader}>
+                    <View style={styles.modalTitleContainer}>
+                        <View style={[styles.modalIconCircle, { backgroundColor: color + '15' }]}>
+                            <Icon name={getNutrientIcon()} size={28} color={color} />
+                        </View>
+                        <View>
+                            <Text style={styles.modalTitle}>{nutrientType}</Text>
+                            <Text style={styles.modalSubtitle}>7:00 AM - 5:00 PM</Text>
+                        </View>
+                    </View>
+                    
+                    <TouchableOpacity 
+                        style={styles.modalDatePickerButton}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Icon name="calendar" size={18} color="#10B981" />
+                        <Text style={styles.modalDatePickerButtonText}>
+                            {selectedDate.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
+                        </Text>
+                        <Icon name="chevron-down" size={14} color="#64748B" />
+                    </TouchableOpacity>
+                </View>
+
+                <View 
+                    style={styles.nutrientChartArea}
+                    onLayout={(e) => setChartLayout(e.nativeEvent.layout)}
+                >
+                    {loading ? (
+                        <View style={styles.loadingContainer}>
+                            <ActivityIndicator size="large" color={color} />
+                            <Text style={styles.loadingText}>Loading chart data...</Text>
+                        </View>
+                    ) : filteredData.length === 0 ? (
+                        <View style={styles.noDataContainer}>
+                            <Icon name="calendar-blank" size={48} color="#CBD5E1" />
+                            <Text style={styles.noDataText}>No data available for this date</Text>
+                            <Text style={styles.noDataSubtext}>Try selecting a different date</Text>
+                        </View>
+                    ) : (
+                        <Svg height={GRAPH_HEIGHT + TOP_PADDING + BOTTOM_PADDING} width="100%">
+                            <Defs>
+                                <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+                                    <Stop offset="0" stopColor={gradientColor} stopOpacity="0.35" />
+                                    <Stop offset="0.4" stopColor={gradientColor} stopOpacity="0.15" />
+                                    <Stop offset="1" stopColor={gradientColor} stopOpacity="0" />
+                                </LinearGradient>
+                            </Defs>
+                            
+                            {yLabels.map(val => (
+                                <G key={val}>
+                                    <Line 
+                                        x1={LEFT_MARGIN} 
+                                        y1={getYPos(val, maxVal)} 
+                                        x2={chartLayout.width - RIGHT_MARGIN} 
+                                        y2={getYPos(val, maxVal)} 
+                                        stroke="#F1F5F9" 
+                                        strokeWidth="1" 
+                                        strokeDasharray="4 4"
+                                    />
+                                    <SvgText 
+                                        x={LEFT_MARGIN - 10} 
+                                        y={getYPos(val, maxVal) + 4} 
+                                        fontSize="11" 
+                                        fill="#94A3B8" 
+                                        textAnchor="end" 
+                                        fontWeight="600"
+                                    >
+                                        {val}%
+                                    </SvgText>
+                                </G>
+                            ))}
+
+                            {TIME_LABELS.map((t) => (
+                                <SvgText 
+                                    key={t.label}
+                                    x={getCoordinateX(t.hr, chartLayout.width)} 
+                                    y={GRAPH_HEIGHT + TOP_PADDING + 20} 
+                                    fontSize="10" 
+                                    fill="#64748B" 
+                                    textAnchor="middle" 
+                                    fontWeight="600"
+                                >
+                                    {t.label}
+                                </SvgText>
+                            ))}
+
+                            {points.length > 1 && (
+                                <>
+                                    {/* GRADIENT FILL AREA (SHADOW UNDER THE LINE) - Uses lighter gradient color */}
+                                    <AnimatedPath 
+                                        d={fillPathString} 
+                                        fill={`url(#${gradientId})`} 
+                                        opacity={drawAnim} 
+                                    />
+                                    
+                                    {/* SMOOTH LINE PATH */}
+                                    <AnimatedPath 
+                                        d={smoothPathData} 
+                                        fill="none" 
+                                        stroke={color} 
+                                        strokeWidth="3" 
+                                        strokeLinejoin="round"
+                                        strokeLinecap="round"
+                                        opacity={drawAnim}
+                                    />
+                                    
+                                    {/* DATA POINTS CIRCLES */}
+                                    {points.map((point, idx) => (
+                                        <Circle
+                                            key={idx}
+                                            cx={point.x}
+                                            cy={point.y}
+                                            r="5"
+                                            fill={color}
+                                            stroke="#FFF"
+                                            strokeWidth="2.5"
+                                        />
+                                    ))}
+                                </>
+                            )}
+
+                            {hoverData && (() => {
+                                const date = new Date(hoverData.created_at);
+                                const h = date.getHours() + (date.getMinutes() / 60);
+                                const x = getCoordinateX(h, chartLayout.width);
+                                let hoverValue = 0;
+                                if (nutrientType === 'SOIL HUMIDITY') {
+                                    hoverValue = parseFloat(hoverData.soilaverage) || 0;
+                                } else {
+                                    hoverValue = parseFloat(hoverData[nutrientKey]) || 0;
+                                }
+                                const y = getYPos(hoverValue, maxVal);
+                                
+                                return (
+                                    <G>
+                                        <Line 
+                                            x1={x} 
+                                            y1={TOP_PADDING} 
+                                            x2={x} 
+                                            y2={GRAPH_HEIGHT + TOP_PADDING} 
+                                            stroke={color} 
+                                            strokeWidth="1.5" 
+                                            strokeDasharray="4 4" 
+                                        />
+                                        <Circle 
+                                            cx={x} 
+                                            cy={y} 
+                                            r="7" 
+                                            fill={color} 
+                                            stroke="#FFF" 
+                                            strokeWidth="3" 
+                                        />
+                                        <Rect 
+                                            x={Math.max(LEFT_MARGIN, Math.min(x - 55, chartLayout.width - 120))}
+                                            y={y - 50}
+                                            width="110"
+                                            height="45"
+                                            rx="10"
+                                            fill="#1E293B"
+                                            opacity="0.95"
+                                        />
+                                        <SvgText 
+                                            x={Math.max(LEFT_MARGIN + 55, Math.min(x, chartLayout.width - 65))}
+                                            y={y - 30} 
+                                            fill="#FFF" 
+                                            fontSize="13" 
+                                            fontWeight="800" 
+                                            textAnchor="middle"
+                                        >
+                                            {hoverValue.toFixed(1)}%
+                                        </SvgText>
+                                        <SvgText 
+                                            x={Math.max(LEFT_MARGIN + 55, Math.min(x, chartLayout.width - 65))}
+                                            y={y - 15} 
+                                            fill="#94A3B8" 
+                                            fontSize="9" 
+                                            textAnchor="middle"
+                                        >
+                                            {formatTimeForDisplay(hoverData.created_at)}
+                                        </SvgText>
+                                    </G>
+                                );
+                            })()}
+                        </Svg>
+                    )}
+
+                    {filteredData.length > 0 && (
+                        <View 
+                            style={StyleSheet.absoluteFill}
+                            onPointerMove={(e) => handleHover(e)}
+                            onPointerLeave={() => setHoverData(null)}
+                            onStartShouldSetResponder={() => true}
+                            onResponderMove={(e) => handleHover(e)}
+                            onResponderRelease={() => setHoverData(null)}
+                        />
+                    )}
+                </View>
+
+                {filteredData.length > 0 && (
+                    <View style={styles.modalStatsGrid}>
+                        <View style={styles.modalStatCard}>
+                            <Icon name="chart-line" size={16} color={getNutrientColor()} />
+                            <Text style={styles.modalStatLabel}>Latest</Text>
+                            <Text style={[styles.modalStatValue, { color: getNutrientColor(), fontSize: 16 }]}>{latestValue}%</Text>
+                        </View>
+                        <View style={styles.modalStatCard}>
+                            <Icon name="chart-areaspline" size={16} color="#6366F1" />
+                            <Text style={styles.modalStatLabel}>Average</Text>
+                            <Text style={[styles.modalStatValue, { fontSize: 16 }]}>{avgValue}%</Text>
+                        </View>
+                        <View style={styles.modalStatCard}>
+                            <Icon name="trending-up" size={16} color="#10B981" />
+                            <Text style={styles.modalStatLabel}>Max</Text>
+                            <Text style={[styles.modalStatValue, { fontSize: 16 }]}>{maxValue}%</Text>
+                        </View>
+                        <View style={styles.modalStatCard}>
+                            <Icon name="trending-down" size={16} color="#EF4444" />
+                            <Text style={styles.modalStatLabel}>Min</Text>
+                            <Text style={[styles.modalStatValue, { fontSize: 16 }]}>{minValue}%</Text>
+                        </View>
+                    </View>
+                )}
+
+                {filteredData.length > 0 && (
+                    <View style={styles.modalDataInfo}>
+                        <Icon name="database" size={12} color="#94A3B8" />
+                        <Text style={styles.modalDataInfoText}>{filteredData.length} readings recorded for selected date</Text>
+                    </View>
+                )}
+            </View>
+        );
+    };
+
+    return (
+        <>
+            <Modal
+                transparent={true}
+                visible={visible}
+                animationType="fade"
+                onRequestClose={onClose}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.nutrientModalBox}>
+                        <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
+                            <Icon name="close" size={22} color="#64748B" />
+                        </TouchableOpacity>
+                        
+                        <ScrollView 
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={styles.modalScrollContent}
+                        >
+                            {renderChart()}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+            
+            <CustomDatePicker 
+                visible={showDatePicker}
+                onClose={() => setShowDatePicker(false)}
+                onSelectDate={handleDateSelect}
+                currentDate={selectedDate}
+                availableDates={availableDates}
+            />
+        </>
+    );
+};
+
 export default function PlantsDashboard() {
     const [activeTab, setActiveTab] = useState('Paquillo Pepper');
     const [cropFilter, setCropFilter] = useState('Weekly');
@@ -887,6 +1417,10 @@ export default function PlantsDashboard() {
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [availableDates, setAvailableDates] = useState([]);
+
+    // Nutrient Graph Modal States
+    const [nutrientModalVisible, setNutrientModalVisible] = useState(false);
+    const [selectedNutrient, setSelectedNutrient] = useState(null);
 
     const animNitrogen = useRef(new Animated.Value(0)).current;
     const animPhosphorus = useRef(new Animated.Value(0)).current;
@@ -1057,6 +1591,11 @@ export default function PlantsDashboard() {
     const handleDateSelect = (date) => {
         setSelectedDate(date);
         setLoading(true);
+    };
+
+    const handleNutrientPress = (nutrientType) => {
+        setSelectedNutrient(nutrientType);
+        setNutrientModalVisible(true);
     };
 
     const NUTRIENT_DATA = [
@@ -1488,39 +2027,43 @@ export default function PlantsDashboard() {
         </View>
     );
 
-const renderNutrients = () => (
-    <View style={styles.colorindications}>
-        <Text style={styles.sectionTitle}>Nutrients</Text>
-        
-        {/* Nutrient Bars inside white box */}
-        <View style={styles.nutrientsBox}>
-            <View style={styles.nutrientsContainer}>
-                {NUTRIENT_DATA.map((item, i) => (
-                    <View key={i} style={styles.nutrientRow}>
-                        <Animated.View 
-                            style={[
-                                styles.nutrientBar, 
-                                { 
-                                    backgroundColor: item.color, 
-                                    width: item.anim.interpolate({
-                                        inputRange: [0, 100],
-                                        outputRange: ['0%', '100%']
-                                    }) 
-                                }
-                            ]}
+    const renderNutrients = () => (
+        <View style={styles.colorindications}>
+            <Text style={styles.sectionTitle}>Nutrients</Text>
+            
+            {/* Nutrient Bars inside white box - NOW CLICKABLE */}
+            <View style={styles.nutrientsBox}>
+                <View style={styles.nutrientsContainer}>
+                    {NUTRIENT_DATA.map((item, i) => (
+                        <TouchableOpacity 
+                            key={i} 
+                            style={styles.nutrientRow}
+                            onPress={() => handleNutrientPress(item.label)}
+                            activeOpacity={0.7}
                         >
-                            <Text style={[styles.nutrientBarLabel, { color: item.textcolor }]}>{item.label}</Text>
-                        </Animated.View>
-                        <Text style={styles.nutrientPercent}>{item.value.toFixed(0)}%</Text>
-                    </View>
-                ))}
+                            <Animated.View 
+                                style={[
+                                    styles.nutrientBar, 
+                                    { 
+                                        backgroundColor: item.color, 
+                                        width: item.anim.interpolate({
+                                            inputRange: [0, 100],
+                                            outputRange: ['0%', '100%']
+                                        }) 
+                                    }
+                                ]}
+                            >
+                                <Text style={[styles.nutrientBarLabel, { color: item.textcolor }]}>{item.label}</Text>
+                            </Animated.View>
+                            <Text style={styles.nutrientPercent}>{item.value.toFixed(0)}%</Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
             </View>
-        </View>
 
             {/* Soil Quality Monitor - Flexible Table with consistent spacing */}
             <View style={styles.soilQualityMonitorBox}>
                 <Text style={styles.logTitle}>Soil Quality Monitor</Text>
-                
                 
                 {/* Table Header with consistent spacing */}
                 <View style={styles.tableHead}>
@@ -1530,8 +2073,12 @@ const renderNutrients = () => (
                     <Text style={[styles.th, styles.thStatus]}>Status</Text>
                 </View>
                 
-                {/* Nitrogen Row */}
-                <View style={styles.tableRow}>
+                {/* Nitrogen Row - CLICKABLE */}
+                <TouchableOpacity 
+                    style={styles.tableRow}
+                    onPress={() => handleNutrientPress('NITROGEN')}
+                    activeOpacity={0.7}
+                >
                     <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Nitrogen (N)</Text>
                     <Text style={[styles.td, styles.tdLevel]}>{sensorData.nitrogen.toFixed(0)}%</Text>
                     <Text style={[styles.td, styles.tdRecommendation]}>
@@ -1563,10 +2110,14 @@ const renderNutrients = () => (
                             </Text>
                         </View>
                     </View>
-                </View>
+                </TouchableOpacity>
                 
-                {/* Phosphorus Row */}
-                <View style={styles.tableRow}>
+                {/* Phosphorus Row - CLICKABLE */}
+                <TouchableOpacity 
+                    style={styles.tableRow}
+                    onPress={() => handleNutrientPress('PHOSPHORUS')}
+                    activeOpacity={0.7}
+                >
                     <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Phosphorus (P)</Text>
                     <Text style={[styles.td, styles.tdLevel]}>{sensorData.phosphorus.toFixed(0)}%</Text>
                     <Text style={[styles.td, styles.tdRecommendation]}>
@@ -1598,10 +2149,14 @@ const renderNutrients = () => (
                             </Text>
                         </View>
                     </View>
-                </View>
+                </TouchableOpacity>
                 
-                {/* Potassium Row */}
-                <View style={styles.tableRow}>
+                {/* Potassium Row - CLICKABLE */}
+                <TouchableOpacity 
+                    style={styles.tableRow}
+                    onPress={() => handleNutrientPress('POTASSIUM')}
+                    activeOpacity={0.7}
+                >
                     <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Potassium (K)</Text>
                     <Text style={[styles.td, styles.tdLevel]}>{sensorData.potassium.toFixed(0)}%</Text>
                     <Text style={[styles.td, styles.tdRecommendation]}>
@@ -1633,10 +2188,14 @@ const renderNutrients = () => (
                             </Text>
                         </View>
                     </View>
-                </View>
+                </TouchableOpacity>
                 
-                {/* Soil Humidity Row */}
-                <View style={styles.tableRow}>
+                {/* Soil Humidity Row - CLICKABLE */}
+                <TouchableOpacity 
+                    style={styles.tableRow}
+                    onPress={() => handleNutrientPress('SOIL HUMIDITY')}
+                    activeOpacity={0.7}
+                >
                     <Text style={[styles.td, styles.tdParameter, styles.cellBold]}>Soil Humidity</Text>
                     <Text style={[styles.td, styles.tdLevel]}>{sensorData.soilHumidity.toFixed(0)}%</Text>
                     <Text style={[styles.td, styles.tdRecommendation]}>
@@ -1668,8 +2227,21 @@ const renderNutrients = () => (
                             </Text>
                         </View>
                     </View>
-                </View>
+                </TouchableOpacity>
             </View>
+            
+            {/* Nutrient Graph Modal */}
+            <NutrientGraphModal 
+                visible={nutrientModalVisible}
+                onClose={() => setNutrientModalVisible(false)}
+                nutrientType={selectedNutrient}
+                nutrientData={selectedNutrient ? 
+                    (selectedNutrient === 'SOIL HUMIDITY' ? sensorData.soilHumidity :
+                     selectedNutrient === 'NITROGEN' ? sensorData.nitrogen :
+                     selectedNutrient === 'PHOSPHORUS' ? sensorData.phosphorus :
+                     sensorData.potassium) : 0}
+                allSensorData={sensorData}
+            />
         </View>
     );
 
@@ -2283,5 +2855,134 @@ const styles = StyleSheet.create({
         borderColor: '#F1F5F9',
         width: '100%',
     },
-    
+    // Nutrient Modal Styles - WIDER WITH GRADIENT FILL (FIXED)
+    nutrientModalBox: {
+        backgroundColor: '#FFF',
+        borderRadius: 28,
+        width: '95%',
+        maxWidth: 900,
+        maxHeight: '90%',
+        padding: 24,
+        position: 'relative',
+        elevation: 15,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+    },
+    modalCloseBtn: {
+        position: 'absolute',
+        right: 20,
+        top: 20,
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#F1F5F9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 20,
+    },
+    modalScrollContent: {
+        paddingBottom: 20,
+    },
+    nutrientModalContainer: {
+        width: '100%',
+    },
+    nutrientModalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+        paddingRight: 50,
+    },
+    modalTitleContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+    },
+    modalIconCircle: {
+        width: 54,
+        height: 54,
+        borderRadius: 27,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    modalTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+        color: '#1E293B',
+    },
+    modalSubtitle: {
+        fontSize: 12,
+        color: '#94A3B8',
+        fontWeight: '500',
+        marginTop: 4,
+    },
+    modalDatePickerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F8FAFC',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 24,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        gap: 8,
+    },
+    modalDatePickerButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#1E293B',
+    },
+    nutrientChartArea: {
+        width: '100%',
+        minHeight: 400,
+        position: 'relative',
+        marginBottom: 20,
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 14,
+        color: '#64748B',
+        fontWeight: '500',
+    },
+    modalStatsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+        marginBottom: 16,
+    },
+    modalStatCard: {
+        flex: 1,
+        minWidth: 100,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 14,
+        padding: 12,
+        alignItems: 'center',
+        gap: 6,
+    },
+    modalStatLabel: {
+        fontSize: 11,
+        color: '#64748B',
+        fontWeight: '600',
+    },
+    modalStatValue: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#1E293B',
+    },
+    modalDataInfo: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+    },
+    modalDataInfoText: {
+        fontSize: 11,
+        color: '#94A3B8',
+        fontWeight: '500',
+    },
 });

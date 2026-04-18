@@ -31,12 +31,70 @@ export default function Sensors() {
     const [refreshing2, setRefreshing2] = useState(false);
     const [cameraConnected1, setCameraConnected1] = useState(true);
     const [cameraConnected2, setCameraConnected2] = useState(true);
+    const [cameraError1, setCameraError1] = useState(false);
+    const [cameraError2, setCameraError2] = useState(false);
+    const [cameraLogs, setCameraLogs] = useState([]);
 
     useEffect(() => {
         fetchData();
         const interval = setInterval(fetchData, 30000); // Auto refresh every 30s
         return () => clearInterval(interval);
     }, []);
+
+    // Update camera logs whenever connection status changes
+    useEffect(() => {
+        updateCameraLogs();
+    }, [cameraConnected1, cameraConnected2, cameraError1, cameraError2]);
+
+    const updateCameraLogs = () => {
+        const logs = [];
+        
+        // Camera 1 log
+        let status1 = '';
+        let statusColor1 = '';
+        if (cameraError1) {
+            status1 = 'Disconnected';
+            statusColor1 = '#EF4444';
+        } else if (cameraConnected1) {
+            status1 = 'Active';
+            statusColor1 = '#10B981';
+        } else {
+            status1 = 'Inactive';
+            statusColor1 = '#F59E0B';
+        }
+        
+        logs.push({
+            source: 'Cam 1',
+            type: 'Video Feed',
+            timestamp: new Date().toLocaleTimeString(),
+            status: status1,
+            statusColor: statusColor1
+        });
+        
+        // Camera 2 log
+        let status2 = '';
+        let statusColor2 = '';
+        if (cameraError2) {
+            status2 = 'Disconnected';
+            statusColor2 = '#EF4444';
+        } else if (cameraConnected2) {
+            status2 = 'Active';
+            statusColor2 = '#10B981';
+        } else {
+            status2 = 'Inactive';
+            statusColor2 = '#F59E0B';
+        }
+        
+        logs.push({
+            source: 'Cam 2',
+            type: 'Video Feed',
+            timestamp: new Date().toLocaleTimeString(),
+            status: status2,
+            statusColor: statusColor2
+        });
+        
+        setCameraLogs(logs);
+    };
 
     const fetchData = async () => {
         try {
@@ -142,14 +200,36 @@ export default function Sensors() {
 
     const handleRefreshCamera1 = () => {
         setRefreshing1(true);
+        setCameraError1(false);
         setCameraKey1(Date.now());
         setTimeout(() => setRefreshing1(false), 500);
     };
 
     const handleRefreshCamera2 = () => {
         setRefreshing2(true);
+        setCameraError2(false);
         setCameraKey2(Date.now());
         setTimeout(() => setRefreshing2(false), 500);
+    };
+
+    const handleCameraError1 = () => {
+        setCameraConnected1(false);
+        setCameraError1(true);
+    };
+
+    const handleCameraLoad1 = () => {
+        setCameraConnected1(true);
+        setCameraError1(false);
+    };
+
+    const handleCameraError2 = () => {
+        setCameraConnected2(false);
+        setCameraError2(true);
+    };
+
+    const handleCameraLoad2 = () => {
+        setCameraConnected2(true);
+        setCameraError2(false);
     };
 
     const getAlertLevel = (tempValue, soilValue) => {
@@ -220,8 +300,10 @@ export default function Sensors() {
                             <View style={styles.cameraCard}>
                                 <View style={styles.camHeader}>
                                     <View style={styles.camTitleRow}>
-                                        {/* Green/Red status indicator */}
-                                        <View style={[styles.camStatusDot, { backgroundColor: cameraConnected1 ? '#22C55E' : '#EF4444' }]} />
+                                        {/* Status indicator based on actual connection */}
+                                        <View style={[styles.camStatusDot, { 
+                                            backgroundColor: cameraError1 ? '#EF4444' : (cameraConnected1 ? '#22C55E' : '#F59E0B') 
+                                        }]} />
                                         <Text style={styles.camTitle}>Camera 1</Text>
                                     </View>
                                     <TouchableOpacity onPress={handleRefreshCamera1} style={styles.refreshBtn}>
@@ -233,14 +315,20 @@ export default function Sensors() {
                                         <View style={styles.cameraLoading}>
                                             <ActivityIndicator color="#10B981" />
                                         </View>
+                                    ) : cameraError1 ? (
+                                        <View style={styles.cameraError}>
+                                            <Icon name="camera-off" size={40} color="#EF4444" />
+                                            <Text style={styles.cameraErrorText}>Camera Disconnected</Text>
+                                            <Text style={styles.cameraErrorSubtext}>Check camera connection</Text>
+                                        </View>
                                     ) : (
                                         <Image 
                                             key={cameraKey1}
                                             source={{ uri: `${CAMERA_URL}?_=${cameraKey1}`, headers: { 'ngrok-skip-browser-warning': 'true' } }}
                                             style={styles.cameraImg}
                                             resizeMode="stretch"
-                                            onError={() => setCameraConnected1(false)}
-                                            onLoad={() => setCameraConnected1(true)}
+                                            onError={handleCameraError1}
+                                            onLoad={handleCameraLoad1}
                                         />
                                     )}
                                 </View>
@@ -250,8 +338,10 @@ export default function Sensors() {
                             <View style={styles.cameraCard}>
                                 <View style={styles.camHeader}>
                                     <View style={styles.camTitleRow}>
-                                        {/* Green/Red status indicator */}
-                                        <View style={[styles.camStatusDot, { backgroundColor: cameraConnected2 ? '#22C55E' : '#EF4444' }]} />
+                                        {/* Status indicator based on actual connection */}
+                                        <View style={[styles.camStatusDot, { 
+                                            backgroundColor: cameraError2 ? '#EF4444' : (cameraConnected2 ? '#22C55E' : '#F59E0B') 
+                                        }]} />
                                         <Text style={styles.camTitle}>Camera 2</Text>
                                     </View>
                                     <TouchableOpacity onPress={handleRefreshCamera2} style={styles.refreshBtn}>
@@ -263,14 +353,20 @@ export default function Sensors() {
                                         <View style={styles.cameraLoading}>
                                             <ActivityIndicator color="#10B981" />
                                         </View>
+                                    ) : cameraError2 ? (
+                                        <View style={styles.cameraError}>
+                                            <Icon name="camera-off" size={40} color="#EF4444" />
+                                            <Text style={styles.cameraErrorText}>Camera Disconnected</Text>
+                                            <Text style={styles.cameraErrorSubtext}>Check camera connection</Text>
+                                        </View>
                                     ) : (
                                         <Image 
                                             key={cameraKey2}
                                             source={{ uri: `${CAMERA_URL2}?_=${cameraKey2}`, headers: { 'ngrok-skip-browser-warning': 'true' } }}
                                             style={styles.cameraImg}
                                             resizeMode="stretch"
-                                            onError={() => setCameraConnected2(false)}
-                                            onLoad={() => setCameraConnected2(true)}
+                                            onError={handleCameraError2}
+                                            onLoad={handleCameraLoad2}
                                         />
                                     )}
                                 </View>
@@ -286,16 +382,22 @@ export default function Sensors() {
                                 <Text style={[styles.th, styles.thThird]}>Timestamp</Text>
                                 <Text style={[styles.th, styles.thFourth]}>Status</Text>
                             </View>
-                            {['Cam 1', 'Cam 2'].map((cam, i) => (
+                            {cameraLogs.map((log, i) => (
                                 <View key={i} style={styles.tableRow}>
-                                    <Text style={[styles.td, styles.tdFirst]}>{cam}</Text>
-                                    <Text style={[styles.td, styles.tdSecond]}>Video Feed</Text>
+                                    <Text style={[styles.td, styles.tdFirst]}>{log.source}</Text>
+                                    <Text style={[styles.td, styles.tdSecond]}>{log.type}</Text>
                                     <View style={[styles.tdStatus, styles.tdThird]}>
-                                        <Text style={styles.tdTimeText}>{new Date().toLocaleTimeString()}</Text>
+                                        <Text style={styles.tdTimeText}>{log.timestamp}</Text>
                                     </View>
                                     <View style={[styles.tdStatus, styles.tdFourth]}>
-                                        <View style={styles.badge}>
-                                            <Text style={styles.badgeText}>Active</Text>
+                                        <View style={[styles.badge, log.status === 'Disconnected' && styles.badgeDisconnected, log.status === 'Inactive' && styles.badgeInactive]}>
+                                            <Text style={[styles.badgeText, 
+                                                log.status === 'Active' && styles.badgeTextActive,
+                                                log.status === 'Disconnected' && styles.badgeTextDisconnected,
+                                                log.status === 'Inactive' && styles.badgeTextInactive
+                                            ]}>
+                                                {log.status}
+                                            </Text>
                                         </View>
                                     </View>
                                 </View>
@@ -424,6 +526,25 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%'
     },
+    cameraError: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#FEE2E2'
+    },
+    cameraErrorText: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#EF4444',
+        marginTop: 8
+    },
+    cameraErrorSubtext: {
+        fontSize: 11,
+        color: '#EF4444',
+        marginTop: 4
+    },
     cameraImg: { 
         width: '100%',
         height: '100%',
@@ -457,9 +578,13 @@ const styles = StyleSheet.create({
     tdStatus: { alignItems: 'center' },
     tdTimeText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
     badge: { backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-    badgeInactive: { backgroundColor: '#FEE2E2' },
-    badgeText: { color: '#10B981', fontSize: 10, fontWeight: '800' },
-    badgeTextInactive: { color: '#EF4444' },
+    badgeInactive: { backgroundColor: '#FEF3C7' },
+    badgeDisconnected: { backgroundColor: '#FEE2E2' },
+    badgeText: { fontSize: 10, fontWeight: '800' },
+    badgeTextActive: { color: '#10B981' },
+    badgeTextInactive: { color: '#F59E0B' },
+    badgeTextDisconnected: { color: '#EF4444' },
+    badgeTextInactive: { color: '#F59E0B' },
     alertBadge: { 
         flexDirection: 'row', 
         alignItems: 'center', 
