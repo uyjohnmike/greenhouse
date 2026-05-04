@@ -3,6 +3,7 @@ import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,7 +17,6 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
-// Global access variables
 export let setId = null;
 export let firstName = null;
 export let middleName = null;
@@ -24,7 +24,117 @@ export let lastName = null;
 
 import { NGROK_URL } from "../../ngrok_camera";
 
-// Compact Custom Alert Component
+const PhoneMockup = ({ imageSource, rotation, offsetX, offsetY }) => {
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 768;
+  
+  const getPhoneSize = () => {
+    if (width < 480) return { width: 120, height: 240 };
+    if (width < 768) return { width: 140, height: 280 };
+    return { width: 170, height: 340 };
+  };
+  
+  const phoneSize = getPhoneSize();
+  
+  return (
+    <View style={[styles.phoneWrapper, { 
+      transform: [{ rotate: rotation }], 
+      right: isSmallScreen ? offsetX * 0.5 : offsetX, 
+      top: isSmallScreen ? offsetY * 0.5 : offsetY,
+      width: phoneSize.width,
+      height: phoneSize.height,
+      marginRight: isSmallScreen ? 60 : 120,
+      marginTop: isSmallScreen ? 5 : 10,
+    }]}>
+      <View style={[styles.phoneFrame, { borderRadius: isSmallScreen ? 20 : 28 }]}>
+        <View style={[styles.phoneNotch, { width: isSmallScreen ? 50 : 80, transform: [{ translateX: isSmallScreen ? -25 : -40 }] }]} />
+        <Image
+          source={imageSource}
+          style={styles.phoneImage}
+          resizeMode="cover"
+        />
+        <View style={[styles.phoneHomeBar, { width: isSmallScreen ? 50 : 76, transform: [{ translateX: isSmallScreen ? -25 : -38 }] }]} />
+      </View>
+    </View>
+  );
+};
+
+const PhoneMockups = () => {
+  const { width } = useWindowDimensions();
+  const isSmallScreen = width < 768;
+  const isVerySmallScreen = width < 480;
+  
+  return (
+    <View style={styles.phoneMockupsContainer}>
+      <View style={[styles.phonesWrapper, { height: isSmallScreen ? 250 : 360 }]}>
+        <PhoneMockup
+          imageSource={require('../../appimages/dashboardapp.jpg')}
+          rotation={isVerySmallScreen ? "8deg" : "15deg"}
+          offsetX={isVerySmallScreen ? -30 : -60}
+          offsetY={isVerySmallScreen ? -5 : -10}
+        />
+        <PhoneMockup
+          imageSource={require('../../appimages/image2.jpg')}
+          rotation={isVerySmallScreen ? "-8deg" : "-15deg"}
+          offsetX={isVerySmallScreen ? 30 : 60}
+          offsetY={isVerySmallScreen ? -5 : -10}
+        />
+        <PhoneMockup
+          imageSource={require('../../appimages/image1.jpg')}
+          rotation="0deg"
+          offsetX={0}
+          offsetY={0}
+        />
+      </View>
+
+      <View style={[styles.phoneBottomSection, { marginLeft: isSmallScreen ? 20 : 100 }]}>
+        <View style={[styles.statsGrid, { gap: isSmallScreen ? 6 : 10, marginTop: isSmallScreen ? 60 : 0, }]}>
+          <View style={[styles.statCard, { padding: isSmallScreen ? 6 : 10, maxWidth: isSmallScreen ? 100 : 130 }]}>
+            <View style={[styles.statIconBox, { width: isSmallScreen ? 28 : 36, height: isSmallScreen ? 28 : 36 }]}>
+              <Icon name="clock-outline" size={isSmallScreen ? 16 : 20} color="#52b788" />
+            </View>
+            <Text style={[styles.statValue, { fontSize: isSmallScreen ? 9 : 11 }]}>7AM to 5PM</Text>
+            <Text style={[styles.statName, { fontSize: isSmallScreen ? 8 : 10 }]}>Monitoring</Text>
+          </View>
+
+          <View style={[styles.statCard, { padding: isSmallScreen ? 6 : 10, maxWidth: isSmallScreen ? 100 : 130 }]}>
+            <View style={[styles.statIconBox, { width: isSmallScreen ? 28 : 36, height: isSmallScreen ? 28 : 36 }]}>
+              <Icon name="bug-outline" size={isSmallScreen ? 16 : 20} color="#52b788" />
+            </View>
+            <Text style={[styles.statValue, { fontSize: isSmallScreen ? 9 : 11 }]}>AI</Text>
+            <Text style={[styles.statName, { fontSize: isSmallScreen ? 8 : 10 }]}>Pest Detection</Text>
+          </View>
+
+          <View style={[styles.statCard, { padding: isSmallScreen ? 6 : 10, maxWidth: isSmallScreen ? 100 : 130 }]}>
+            <View style={[styles.statIconBox, { width: isSmallScreen ? 28 : 36, height: isSmallScreen ? 28 : 36 }]}>
+              <Icon name="wifi-strength-4" size={isSmallScreen ? 16 : 20} color="#52b788" />
+            </View>
+            <Text style={[styles.statValue, { fontSize: isSmallScreen ? 9 : 11 }]}>IoT</Text>
+            <Text style={[styles.statName, { fontSize: isSmallScreen ? 8 : 10 }]}>Sensors</Text>
+          </View>
+        </View>
+
+        <View style={[styles.bottomDivider, { marginVertical: isSmallScreen ? 6 : 10 }]} />
+
+        <View style={[styles.trustSection, { gap: isSmallScreen ? 6 : 12 }]}>
+          <View style={[styles.trustBadge, { paddingHorizontal: isSmallScreen ? 8 : 12, paddingVertical: isSmallScreen ? 4 : 6 }]}>
+            <Icon name="check-circle" size={isSmallScreen ? 8 : 12} color="#52b788" />
+            <Text style={[styles.trustText, { fontSize: isSmallScreen ? 7 : 9 }]}>100% Cloud Native</Text>
+          </View>
+          <View style={[styles.trustBadge, { paddingHorizontal: isSmallScreen ? 8 : 12, paddingVertical: isSmallScreen ? 4 : 6 }]}>
+            <Icon name="check-circle" size={isSmallScreen ? 8 : 12} color="#52b788" />
+            <Text style={[styles.trustText, { fontSize: isSmallScreen ? 7 : 9 }]}>Enterprise Grade</Text>
+          </View>
+          <View style={[styles.trustBadge, { paddingHorizontal: isSmallScreen ? 8 : 12, paddingVertical: isSmallScreen ? 4 : 6 }]}>
+            <Icon name="check-circle" size={isSmallScreen ? 8 : 12} color="#52b788" />
+            <Text style={[styles.trustText, { fontSize: isSmallScreen ? 7 : 9 }]}>Zero Downtime</Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const CustomAlert = ({ visible, title, message, type, onClose, autoClose = false }) => {
   const translateY = useRef(new Animated.Value(-100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -124,7 +234,6 @@ const CustomAlert = ({ visible, title, message, type, onClose, autoClose = false
   );
 };
 
-// Separate Login Form Component to prevent re-renders
 const LoginForm = memo(({ 
   email, 
   setEmail, 
@@ -241,6 +350,7 @@ const GreenhouseLanding = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showLanding, setShowLanding] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
+  const [showStructure, setShowStructure] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({
     title: '',
@@ -249,13 +359,17 @@ const GreenhouseLanding = () => {
     autoClose: false
   });
 
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isLargeScreen = width >= 850;
-  
-  // Animation values
+  const isSmallScreen = width < 768;
+  const isVerySmallScreen = width < 480;
+  const isCompactScreen = height <= 700;
+
   const landingFadeAnim = useRef(new Animated.Value(1)).current;
   const loginFadeAnim = useRef(new Animated.Value(0)).current;
   const loginScaleAnim = useRef(new Animated.Value(0.95)).current;
+  const structureFadeAnim = useRef(new Animated.Value(0)).current;
+  const structureScaleAnim = useRef(new Animated.Value(0.95)).current;
 
   const router = useRouter();
 
@@ -286,26 +400,21 @@ const GreenhouseLanding = () => {
       const result = await response.json();
 
       if (response.status === 200) {
-        // Check if user status is Active
         if (result.user.status === "Active") {
-          // User is active - allow login
           setId = result.user.user_id;
           firstName = result.user.firstname;
           middleName = result.user.middlename;
           lastName = result.user.lastname;
           showAlert("✓ VERIFIED", "Login Successfully!", "success", true);
-          // Navigate after alert auto-closes
           setTimeout(() => {
             router.replace('/(tabs)/designs/dashboard');
             setPassword('');
             setEmail('');
           }, 2000);
         } else if (result.user.status === "Inactive") {
-          // Account is deactivated - show error
           showAlert("ACCOUNT DEACTIVATED", "Your account has been deactivated. Please contact administrator.", "error");
           setPassword('');
         } else {
-          // Unknown status
           showAlert("ACCESS DENIED", "Unable to verify account status. Please contact support.", "error");
           setPassword('');
         }
@@ -342,13 +451,42 @@ const GreenhouseLanding = () => {
     ]).start(() => {
       setShowLanding(false);
       setShowLogin(true);
+      setShowStructure(false);
     });
   }, [landingFadeAnim, loginFadeAnim, loginScaleAnim]);
+
+  const handleShowStructure = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(landingFadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(structureFadeAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(structureScaleAnim, {
+        toValue: 1,
+        duration: 500,
+        delay: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowLanding(false);
+      setShowStructure(true);
+      setShowLogin(false);
+    });
+  }, [landingFadeAnim, structureFadeAnim, structureScaleAnim]);
 
   const handleBackToLanding = useCallback(() => {
     landingFadeAnim.setValue(0);
     loginFadeAnim.setValue(1);
     loginScaleAnim.setValue(1);
+    structureFadeAnim.setValue(1);
+    structureScaleAnim.setValue(1);
     
     Animated.parallel([
       Animated.timing(loginFadeAnim, {
@@ -361,6 +499,16 @@ const GreenhouseLanding = () => {
         duration: 400,
         useNativeDriver: true,
       }),
+      Animated.timing(structureFadeAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(structureScaleAnim, {
+        toValue: 0.95,
+        duration: 400,
+        useNativeDriver: true,
+      }),
       Animated.timing(landingFadeAnim, {
         toValue: 1,
         duration: 500,
@@ -369,102 +517,173 @@ const GreenhouseLanding = () => {
       }),
     ]).start(() => {
       setShowLogin(false);
+      setShowStructure(false);
       setShowLanding(true);
     });
-  }, [landingFadeAnim, loginFadeAnim, loginScaleAnim]);
+  }, [landingFadeAnim, loginFadeAnim, loginScaleAnim, structureFadeAnim, structureScaleAnim]);
 
-  // Landing Page Content Component
+  const features = [
+    { icon: "thermometer", title: "Climate", desc: "Temp & Humidity", items: ["Temperature Sensor", "Air Humidity", "Auto Pump Control"] },
+    { icon: "solar-power", title: "Power System", desc: "Solar & Battery", items: ["Solar Panel", "Battery Backup", "Inverter & Breakers"] },
+    { icon: "water", title: "Irrigation", desc: "Water Control", items: ["Soil Humidity", "Dual Water Pumps", "Drum Insecticide Level"] },
+    { icon: "leaf", title: "Soil Health", desc: "Nutrients", items: ["NPK Sensor", "Soil Moisture", "Nutrient Analysis"] },
+    { icon: "cctv", title: "Monitoring", desc: "AI Vision", items: ["Pest Detection", "Pepper Ripeness AI", "Live Camera Feed"] },
+    { icon: "chart-line", title: "Analytics", desc: "Reports", items: ["Sensor Logs", "Crop Health Graph", "Performance Trends"] }
+  ];
+
+  const rows = [];
+  for (let i = 0; i < features.length; i += 3) {
+    rows.push(features.slice(i, i + 3));
+  }
+
   const LandingContent = useCallback(() => (
-    <Animated.View style={[styles.heroSection, { opacity: landingFadeAnim }]}>
-      <View style={styles.tag}>
-        <Text style={styles.tagText}>PREMIUM AGRI-TECH</Text>
-      </View>
-      <Text style={styles.heroTitle}>
-        Piquillo<Text style={{ color: '#52b788' }}>MS</Text>
-      </Text>
-      <Text style={styles.heroSub}>
-        Greenhouse Management System with IoT Integration and Cloud-Based Computing with 
-        AI Powered Pest Detection and Plant Physical Appearance Monitoring
-      </Text>
+    <Animated.View style={[styles.heroSection, { 
+      opacity: landingFadeAnim,
+      flexDirection: isSmallScreen ? 'column' : 'row',
+      gap: isSmallScreen ? 20 : 30,
+    }]}>
+      <View style={[styles.heroContent, { paddingVertical: isSmallScreen ? 10 : 20 }]}>
+        <View style={styles.tag}>
+          <Text style={[styles.tagText, { fontSize: isSmallScreen ? 7 : 9 }]}>PREMIUM AGRI-TECH</Text>
+        </View>
+        <Text style={[styles.heroTitle, { fontSize: isSmallScreen ? 32 : 44 }]}>
+          Piquillo<Text style={{ color: '#52b788' }}>MS</Text>
+        </Text>
+        <Text style={[styles.heroSub, { fontSize: isSmallScreen ? 11 : 13, maxWidth: isSmallScreen ? '100%' : 520 }]}>
+          Greenhouse Management System with IoT Integration and Cloud-Based Computing with AI-Based 
+          Pest Detection and Piquillo Pepper Ripeness Classification
+        </Text>
 
-      <View style={styles.featureGrid}>
-        <View style={styles.categoryBox}>
-          <Icon name="thermometer" size={20} color="#52b788" />
-          <Text style={styles.categoryTitle}>Climate</Text>
-          <Text style={styles.categoryDesc}>Temp & Humidity</Text>
-          <View style={styles.subFeatures}>
-            <Text style={styles.subFeature}>• Temperature Sensor</Text>
-            <Text style={styles.subFeature}>• Air Humidity</Text>
-            <Text style={styles.subFeature}>• Auto Pump Control</Text>
-          </View>
+        <View style={styles.featureGrid}>
+          {rows.map((row, rowIndex) => (
+            <View key={rowIndex} style={[styles.featureRow, { gap: isSmallScreen ? 10 : 14, marginBottom: isSmallScreen ? 10 : 14 }]}>
+              {row.map((feature, colIndex) => (
+                <View key={colIndex} style={[styles.categoryBox, { 
+                  width: isSmallScreen ? '100%' : 180,
+                  minWidth: isSmallScreen ? 'auto' : 160,
+                  padding: isSmallScreen ? 10 : 12,
+                  minHeight: isSmallScreen ? 'auto' : 150,
+                }]}>
+                  <Icon name={feature.icon} size={isSmallScreen ? 18 : 22} color="#52b788" />
+                  <Text style={[styles.categoryTitle, { fontSize: isSmallScreen ? 12 : 14 }]}>{feature.title}</Text>
+                  <Text style={[styles.categoryDesc, { fontSize: isSmallScreen ? 8 : 9 }]}>{feature.desc}</Text>
+                  <View style={styles.subFeatures}>
+                    {feature.items.map((item, idx) => (
+                      <Text key={idx} style={[styles.subFeature, { fontSize: isSmallScreen ? 8 : 9 }]}>• {item}</Text>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ))}
         </View>
 
-        <View style={styles.categoryBox}>
-          <Icon name="solar-power" size={20} color="#52b788" />
-          <Text style={styles.categoryTitle}>Power System</Text>
-          <Text style={styles.categoryDesc}>Solar & Battery</Text>
-          <View style={styles.subFeatures}>
-            <Text style={styles.subFeature}>• Solar Panel</Text>
-            <Text style={styles.subFeature}>• Battery Backup</Text>
-            <Text style={styles.subFeature}>• Inverter & Breakers</Text>
-          </View>
-        </View>
+        <View style={[styles.buttonGroup, { gap: isSmallScreen ? 10 : 12 }]}>
+          <TouchableOpacity 
+            style={[styles.mainCta, { paddingHorizontal: isSmallScreen ? 20 : 28, height: isSmallScreen ? 42 : 46 }]} 
+            onPress={handleEnterTerminal}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.ctaText, { fontSize: isSmallScreen ? 11 : 13 }]}>ENTER TERMINAL</Text>
+            <Icon name="chevron-right" size={isSmallScreen ? 16 : 18} color="#fff" />
+          </TouchableOpacity>
 
-        <View style={styles.categoryBox}>
-          <Icon name="water" size={20} color="#52b788" />
-          <Text style={styles.categoryTitle}>Irrigation</Text>
-          <Text style={styles.categoryDesc}>Water Control</Text>
-          <View style={styles.subFeatures}>
-            <Text style={styles.subFeature}>• Soil Humidity</Text>
-            <Text style={styles.subFeature}>• Dual Water Pumps</Text>
-            <Text style={styles.subFeature}>• Drum Insecticide Level</Text>
-          </View>
-        </View>
-
-        <View style={styles.categoryBox}>
-          <Icon name="leaf" size={20} color="#52b788" />
-          <Text style={styles.categoryTitle}>Soil Health</Text>
-          <Text style={styles.categoryDesc}>Nutrients</Text>
-          <View style={styles.subFeatures}>
-            <Text style={styles.subFeature}>• NPK Sensor</Text>
-            <Text style={styles.subFeature}>• Soil Moisture</Text>
-            <Text style={styles.subFeature}>• Nutrient Analysis</Text>
-          </View>
-        </View>
-
-        <View style={styles.categoryBox}>
-          <Icon name="cctv" size={20} color="#52b788" />
-          <Text style={styles.categoryTitle}>Monitoring</Text>
-          <Text style={styles.categoryDesc}>AI Vision</Text>
-          <View style={styles.subFeatures}>
-            <Text style={styles.subFeature}>• Pest Detection</Text>
-            <Text style={styles.subFeature}>• Pepper Ripeness AI</Text>
-            <Text style={styles.subFeature}>• Live Camera Feed</Text>
-          </View>
-        </View>
-
-        <View style={styles.categoryBox}>
-          <Icon name="chart-line" size={20} color="#52b788" />
-          <Text style={styles.categoryTitle}>Analytics</Text>
-          <Text style={styles.categoryDesc}>Reports</Text>
-          <View style={styles.subFeatures}>
-            <Text style={styles.subFeature}>• Sensor Logs</Text>
-            <Text style={styles.subFeature}>• Crop Health Graph</Text>
-            <Text style={styles.subFeature}>• Performance Trends</Text>
-          </View>
+          <TouchableOpacity 
+            style={[styles.structureBtn, { paddingHorizontal: isSmallScreen ? 16 : 22, height: isSmallScreen ? 42 : 46 }]} 
+            onPress={handleShowStructure}
+            activeOpacity={0.8}
+          >
+            <Icon name="floor-plan" size={isSmallScreen ? 16 : 18} color="#fff" />
+            <Text style={[styles.structureBtnText, { fontSize: isSmallScreen ? 10 : 12 }]}>STRUCTURAL DESIGN</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      <TouchableOpacity 
-        style={styles.mainCta} 
-        onPress={handleEnterTerminal}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.ctaText}>ENTER TERMINAL</Text>
-        <Icon name="chevron-right" size={22} color="#fff" />
-      </TouchableOpacity>
+      {!isVerySmallScreen && (
+        <View style={[styles.phoneSideContainer, { minHeight: isSmallScreen ? 400 : 500 }]}>
+          <PhoneMockups />
+        </View>
+      )}
     </Animated.View>
-  ), [landingFadeAnim, handleEnterTerminal]);
+  ), [landingFadeAnim, handleEnterTerminal, handleShowStructure, isSmallScreen, isVerySmallScreen]);
+
+  const StructureContent = useCallback(() => (
+    <Animated.View 
+      style={[
+        styles.structureContainer,
+        {
+          opacity: structureFadeAnim,
+          transform: [{ scale: structureScaleAnim }]
+        }
+      ]}
+    >
+      <View style={[styles.structureCard, isCompactScreen && styles.structureCardCompact, { 
+        padding: isSmallScreen ? 16 : 28,
+        margin: isSmallScreen ? 10 : 0,
+      }]}>
+        <TouchableOpacity onPress={handleBackToLanding} style={styles.backBtnStructure}>
+          <Icon name="arrow-left" size={16} color="#64748b" />
+          <Text style={[styles.backTextStructure, { fontSize: isSmallScreen ? 10 : 11 }]}>BACK TO OVERVIEW</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.structureHeader}>
+          <Icon name="floor-plan" size={isSmallScreen ? 24 : 28} color="#52b788" />
+          <Text style={[styles.structureTitle, isCompactScreen && styles.structureTitleCompact, { fontSize: isSmallScreen ? 24 : 28 }]}>Structural Design</Text>
+          <Text style={[styles.structureSubtitle, isCompactScreen && styles.structureSubtitleCompact, { fontSize: isSmallScreen ? 10 : 12 }]}>Greenhouse Architecture & Material Specifications</Text>
+        </View>
+        
+        <View style={[styles.structureImageContainer, isCompactScreen && styles.structureImageContainerCompact, { padding: isSmallScreen ? 10 : 16 }]}>
+          <Image 
+            source={require('../../appimages/structure.jpg')}
+            style={[styles.structureImage, isCompactScreen && styles.structureImageCompact, { height: isSmallScreen ? 220 : 350 }]}
+            resizeMode="contain"
+          />
+        </View>
+        
+        <View style={[styles.materialsSection, isCompactScreen && styles.materialsSectionCompact]}>
+          <Text style={[styles.materialsTitle, isCompactScreen && styles.materialsTitleCompact, { fontSize: isSmallScreen ? 13 : 16 }]}>Construction Materials</Text>
+          <View style={[styles.materialsGrid, isCompactScreen && styles.materialsGridCompact, { gap: isSmallScreen ? 8 : 14 }]}>
+            <View style={[styles.materialItem, isCompactScreen && styles.materialItemCompact, { 
+              minWidth: isSmallScreen ? 110 : 140,
+              paddingHorizontal: isSmallScreen ? 10 : 18,
+              paddingVertical: isSmallScreen ? 8 : 12,
+            }]}>
+              <Icon name="cube" size={isSmallScreen ? 16 : 20} color="#8B5A2B" />
+              <Text style={[styles.materialName, isCompactScreen && styles.materialNameCompact, { fontSize: isSmallScreen ? 10 : 12 }]}>Wood Frame</Text>
+              <Text style={[styles.materialDesc, isCompactScreen && styles.materialDescCompact, { fontSize: isSmallScreen ? 7 : 9 }]}>Premium treated lumber</Text>
+            </View>
+            <View style={[styles.materialItem, isCompactScreen && styles.materialItemCompact, { 
+              minWidth: isSmallScreen ? 110 : 140,
+              paddingHorizontal: isSmallScreen ? 10 : 18,
+              paddingVertical: isSmallScreen ? 8 : 12,
+            }]}>
+              <Icon name="sun-wireless" size={isSmallScreen ? 16 : 20} color="#52b788" />
+              <Text style={[styles.materialName, isCompactScreen && styles.materialNameCompact, { fontSize: isSmallScreen ? 10 : 12 }]}>UV Plastic</Text>
+              <Text style={[styles.materialDesc, isCompactScreen && styles.materialDescCompact, { fontSize: isSmallScreen ? 7 : 9 }]}>UV-protected polycarbonate</Text>
+            </View>
+            <View style={[styles.materialItem, isCompactScreen && styles.materialItemCompact, { 
+              minWidth: isSmallScreen ? 110 : 140,
+              paddingHorizontal: isSmallScreen ? 10 : 18,
+              paddingVertical: isSmallScreen ? 8 : 12,
+            }]}>
+              <Icon name="fan" size={isSmallScreen ? 16 : 20} color="#4A90D9" />
+              <Text style={[styles.materialName, isCompactScreen && styles.materialNameCompact, { fontSize: isSmallScreen ? 10 : 12 }]}>Open Net Sides</Text>
+              <Text style={[styles.materialDesc, isCompactScreen && styles.materialDescCompact, { fontSize: isSmallScreen ? 7 : 9 }]}>Ventilation & airflow</Text>
+            </View>
+            <View style={[styles.materialItem, isCompactScreen && styles.materialItemCompact, { 
+              minWidth: isSmallScreen ? 110 : 140,
+              paddingHorizontal: isSmallScreen ? 10 : 18,
+              paddingVertical: isSmallScreen ? 8 : 12,
+            }]}>
+              <Icon name="home-variant-outline" size={isSmallScreen ? 16 : 20} color="#3498db" />
+              <Text style={[styles.materialName, isCompactScreen && styles.materialNameCompact, { fontSize: isSmallScreen ? 10 : 12 }]}>Dimensional</Text>
+              <Text style={[styles.materialDesc, isCompactScreen && styles.materialDescCompact, { fontSize: isSmallScreen ? 7 : 9 }]}>548 cm / 243 cm / 243 cm</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Animated.View>
+  ), [structureFadeAnim, structureScaleAnim, handleBackToLanding, isCompactScreen, isSmallScreen]);
 
   return (
     <View style={styles.pageWrapper}>
@@ -475,7 +694,7 @@ const GreenhouseLanding = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.scrollContent, { padding: isSmallScreen ? 10 : 20 }]} showsVerticalScrollIndicator={false}>
           {showLanding && <LandingContent />}
           {showLogin && (
             <Animated.View 
@@ -490,8 +709,8 @@ const GreenhouseLanding = () => {
               <LoginForm 
                 email={email}
                 setEmail={setEmail}
-                password={password}
                 setPassword={setPassword}
+                password={password}
                 isLoading={isLoading}
                 handleLogin={handleLogin}
                 handleBackToLanding={handleBackToLanding}
@@ -499,6 +718,7 @@ const GreenhouseLanding = () => {
               />
             </Animated.View>
           )}
+          {showStructure && <StructureContent />}
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -517,11 +737,10 @@ const GreenhouseLanding = () => {
 const styles = StyleSheet.create({
   pageWrapper: { flex: 1, backgroundColor: '#f8fafc' },
   
-  scrollContent: { 
-    flexGrow: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: 25,
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   
   loginWrapper: {
@@ -530,84 +749,410 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   
-  blurBlob: { position: 'absolute', borderRadius: 300, opacity: 0.6 },
-  blob1: { top: -100, right: -50, backgroundColor: '#d8f3dc', width: 350, height: 350 },
-  blob2: { bottom: -150, left: -50, backgroundColor: '#b7e4c7', width: 600, height: 600 },
+  blurBlob: { position: 'absolute', borderRadius: 300, opacity: 0.5 },
+  blob1: { top: -150, right: -80, backgroundColor: '#d8f3dc', width: 280, height: 280 },
+  blob2: { bottom: -180, left: -80, backgroundColor: '#b7e4c7', width: 450, height: 450 },
   
-  heroSection: { 
-    alignItems: 'center', 
-    maxWidth: 1100, 
+  heroSection: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    maxWidth: 1300,
     width: '100%',
     zIndex: 10,
   },
-  tag: { backgroundColor: '#02442515', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, marginBottom: 10 },
-  tagText: { color: '#0f172a', fontWeight: '800', fontSize: 9, letterSpacing: 1 },
-  heroTitle: { fontSize: 44, fontWeight: '900', color: '#0f172a', textAlign: 'center', letterSpacing: -1.5 },
-  heroSub: { fontSize: 14, color: '#64748b', textAlign: 'center', marginTop: 8, marginBottom: 20, lineHeight: 20, maxWidth: 800 },
   
-  featureGrid: { 
-    flexDirection: 'row', 
-    gap: 12, 
-    marginVertical: 16, 
-    flexWrap: 'wrap', 
+  heroContent: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  
+  phoneSideContainer: {
+    flex: 0.9,
     justifyContent: 'center',
-    maxWidth: 1000
+    alignItems: 'center',
+  },
+  
+  tag: { backgroundColor: '#52b78818', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 16, marginBottom: 12, borderWidth: 1, borderColor: '#d8f3dc' },
+  tagText: { color: '#2d6a4f', fontWeight: '800', letterSpacing: 1.2 },
+  heroTitle: { fontWeight: '900', color: '#0f172a', textAlign: 'center', letterSpacing: -1, marginBottom: 8 },
+  heroSub: { color: '#64748b', textAlign: 'center', marginTop: 8, marginBottom: 20, lineHeight: 20, paddingVertical: 0 },
+  
+  featureGrid: {
+    width: '100%',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  
+  featureRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    flexWrap: 'wrap',
   },
   
   categoryBox: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 12,
-    width: 260,
-    minHeight: 150,
+    borderRadius: 16,
+    flex: 1,
+    maxWidth: 190,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: '#52b788',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
     borderWidth: 1,
-    borderColor: '#e8f2ed',
+    borderColor: '#d8f3dc',
+    borderTopWidth: 3,
+    borderTopColor: '#52b788',
+    position: 'relative',
+    overflow: 'hidden',
   },
   
   categoryTitle: {
-    fontSize: 16,
     fontWeight: '800',
     color: '#0f172a',
-    marginTop: 6,
+    marginTop: 4,
     marginBottom: 2,
   },
-  
+
   categoryDesc: {
-    fontSize: 10,
     color: '#52b788',
     fontWeight: '600',
     marginBottom: 6,
   },
-  
+
   subFeatures: {
     marginTop: 4,
     gap: 2,
   },
-  
+
   subFeature: {
-    fontSize: 9,
     color: '#64748b',
-    lineHeight: 14,
+    lineHeight: 12,
   },
   
-  mainCta: { 
-    backgroundColor: '#1E293B', 
-    paddingHorizontal: 32, 
-    height: 48,
-    borderRadius: 16, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 10, 
-    elevation: 6, 
-    marginTop: 16,
-    marginBottom: 4,
+  buttonGroup: {
+    flexDirection: 'row',
+    marginTop: 20,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
   },
-  ctaText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+
+  mainCta: {
+    backgroundColor: '#1E293B',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    elevation: 4,
+  },
+  ctaText: { color: '#fff', fontWeight: '800', letterSpacing: 0.8 },
+
+  structureBtn: {
+    backgroundColor: '#52b788',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    elevation: 4,
+  },
+  structureBtnText: { color: '#fff', fontWeight: '700', letterSpacing: 0.6 },
+
+  structureContainer: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  structureCard: {
+    backgroundColor: '#fff',
+    borderRadius: 28,
+    maxWidth: 1000,
+    width: '100%',
+    elevation: 6,
+    shadowColor: '#52b788',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e8f2ed',
+  },
+  structureCardCompact: {
+    padding: 16,
+  },
+  backBtnStructure: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  backTextStructure: {
+    color: '#64748b',
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  structureHeader: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  structureTitle: {
+    fontWeight: '900',
+    color: '#2d6a4f',
+    marginTop: 8,
+    letterSpacing: -0.5,
+  },
+  structureTitleCompact: {
+    marginTop: 4,
+  },
+  structureSubtitle: {
+    color: '#74c69d',
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  structureSubtitleCompact: {},
+  structureImageContainer: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e8f2ed',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  structureImageContainerCompact: {
+    marginBottom: 10,
+  },
+  structureImage: {
+    width: '100%',
+    borderRadius: 12,
+  },
+  structureImageCompact: {},
+  materialsSection: {
+    marginBottom: 0,
+  },
+  materialsSectionCompact: {},
+  materialsTitle: {
+    fontWeight: '800',
+    color: '#2d6a4f',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  materialsTitleCompact: {
+    marginBottom: 8,
+  },
+  materialsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  materialsGridCompact: {},
+  materialItem: {
+    alignItems: 'center',
+    backgroundColor: '#f0f7f4',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d8f3dc',
+  },
+  materialItemCompact: {},
+  materialName: {
+    fontWeight: '800',
+    color: '#2d6a4f',
+    marginTop: 8,
+    marginBottom: 2,
+  },
+  materialNameCompact: {
+    marginTop: 4,
+  },
+  materialDesc: {
+    color: '#74c69d',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  materialDescCompact: {},
+  specsSection: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#e8f2ed',
+  },
+  specsSectionCompact: {
+    padding: 8,
+    gap: 6,
+  },
+  specItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8f2ed',
+  },
+  specItemCompact: {
+    paddingVertical: 3,
+  },
+  specLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+    width: 90,
+  },
+  specLabelCompact: {
+    fontSize: 10,
+    width: 80,
+  },
+  specValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2d6a4f',
+    flex: 1,
+  },
+  specValueCompact: {
+    fontSize: 10,
+  },
+
+  phoneMockupsContainer: {
+    position: 'relative',
+    width: '100%',
+    paddingVertical: 15,
+  },
+
+  phonesWrapper: {
+    position: 'relative',
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 8,
+    marginHorizontal: -45,
+  },
+
+  phoneBottomSection: {
+    marginTop: 12,
+  },
+
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+
+  statCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    alignItems: 'center',
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e8f2ed',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+  },
+
+  statIconBox: {
+    backgroundColor: '#f0f7f4',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#d8f3dc',
+  },
+
+  statValue: {
+    fontWeight: '900',
+    color: '#2d6a4f',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+
+  statName: {
+    fontWeight: '800',
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 2,
+    lineHeight: 12,
+  },
+
+  bottomDivider: {
+    height: 1,
+    backgroundColor: '#e8f2ed',
+    marginHorizontal: 20,
+  },
+
+  trustSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    flexWrap: 'wrap',
+  },
+
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f0f7f4',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#d8f3dc',
+  },
+
+  trustText: {
+    fontWeight: '700',
+    color: '#2d6a4f',
+  },
+  
+  phoneWrapper: {
+    position: 'absolute',
+  },
+  
+  phoneFrame: {
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#1e293b',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+    backgroundColor: '#fff',
+  },
+  
+  phoneNotch: {
+    position: 'absolute',
+    top: 0,
+    left: '50%',
+    height: 18,
+    backgroundColor: '#1e293b',
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    zIndex: 10,
+  },
+  
+  phoneImage: {
+    width: '100%',
+    height: '100%',
+  },
+  
+  phoneHomeBar: {
+    position: 'absolute',
+    bottom: 5,
+    left: '50%',
+    height: 3,
+    backgroundColor: '#475569',
+    borderRadius: 2,
+    zIndex: 10,
+  },
 
   mainCanvas: { 
     flexDirection: 'row', 
@@ -739,7 +1284,6 @@ const styles = StyleSheet.create({
   },
   footerText: { color: '#cbd5e1', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
 
-  // Compact Alert Styles
   alertOverlay: {
     position: 'absolute',
     top: 0,

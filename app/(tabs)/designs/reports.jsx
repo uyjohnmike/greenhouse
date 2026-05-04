@@ -15,7 +15,7 @@ import {
     useWindowDimensions,
     View,
 } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { NGROK_URL } from "../../../ngrok_camera";
 
@@ -92,75 +92,187 @@ const isTimeInRange = (date, startHour, startMinute, endHour, endMinute) => {
     return timeInMinutes >= startInMinutes && timeInMinutes <= endInMinutes;
 };
 
-// Helper function to get data for a specific hour with fallback logic
+// Helper function to calculate total peppers (excluding reject)
+const calculateTotalPeppers = (data) => {
+    return (parseInt(data.unripe) || 0) + 
+           (parseInt(data['semi-ripe']) || 0) + 
+           (parseInt(data.ripe) || 0);
+};
+
+// Helper function to get data for a specific hour - FIXED: gets FIRST data in range
 const getDataForHour = (todayData, targetHour) => {
+    // Define exact time ranges for each hour
     const hourRanges = {
-        7: { startHour: 7, startMinute: 0, endHour: 7, endMinute: 59 },
-        8: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 59 },
-        9: { startHour: 9, startMinute: 0, endHour: 9, endMinute: 59 },
-        10: { startHour: 10, startMinute: 0, endHour: 10, endMinute: 59 },
-        11: { startHour: 11, startMinute: 0, endHour: 11, endMinute: 59 },
-        12: { startHour: 12, startMinute: 0, endHour: 12, endMinute: 59 },
-        13: { startHour: 13, startMinute: 0, endHour: 13, endMinute: 59 },
-        14: { startHour: 14, startMinute: 0, endHour: 14, endMinute: 59 },
-        15: { startHour: 15, startMinute: 0, endHour: 15, endMinute: 59 },
+        7: { startHour: 7, startMinute: 0, endHour: 7, endMinute: 39 },
+        8: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 39 },
+        9: { startHour: 9, startMinute: 0, endHour: 9, endMinute: 39 },
+        10: { startHour: 10, startMinute: 0, endHour: 10, endMinute: 39 },
+        11: { startHour: 11, startMinute: 0, endHour: 11, endMinute: 39 },
+        12: { startHour: 12, startMinute: 0, endHour: 12, endMinute: 39 },
+        13: { startHour: 13, startMinute: 0, endHour: 13, endMinute: 39 },
+        14: { startHour: 14, startMinute: 0, endHour: 14, endMinute: 39 },
+        15: { startHour: 15, startMinute: 0, endHour: 15, endMinute: 39 },
         16: { startHour: 16, startMinute: 0, endHour: 16, endMinute: 39 },
-        17: { startHour: 16, startMinute: 40, endHour: 17, endMinute: 30 },
+        17: { startHour: 17, startMinute: 0, endHour: 17, endMinute: 30 },
     };
     
-    if (targetHour === 16) {
-        const primaryData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, 16, 0, 16, 39);
+    const range = hourRanges[targetHour];
+    if (!range) return 0;
+    
+    // Filter data within the specific hour range
+    const hourData = todayData.filter(item => {
+        const date = new Date(item.created_at);
+        return isTimeInRange(date, 
+            range.startHour, range.startMinute,
+            range.endHour, range.endMinute
+        );
+    });
+    
+    if (hourData.length > 0) {
+        // Get the FIRST (earliest) data in this hour range
+        const firstData = hourData.reduce((earliest, current) => {
+            return new Date(current.created_at) < new Date(earliest.created_at) ? current : earliest;
         });
         
-        if (primaryData.length > 0) {
-            const bestData = primaryData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
+        // Calculate total (unripe + semi-ripe + ripe) - EXCLUDING reject
+        const totalPeppers = calculateTotalPeppers(firstData);
         
-        const fallbackData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, 15, 40, 16, 0);
-        });
-        
-        if (fallbackData.length > 0) {
-            const bestData = fallbackData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-        
-        return 0;
+        // Calculate revenue: total peppers * 15
+        return totalPeppers * 15;
     }
     
-    if (hourRanges[targetHour]) {
-        const range = hourRanges[targetHour];
-        const hourData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, range.startHour, range.startMinute, range.endHour, range.endMinute);
-        });
-        
-        if (hourData.length > 0) {
-            const bestData = hourData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-    }
-    
+    // If no data, return 0 (bar won't show)
     return 0;
+};
+
+// Custom Horizontal Scroll Component with Mouse/Touch Drag Support
+const HorizontalDragScroll = ({ children, data, initialScrollToEnd = true }) => {
+    const scrollViewRef = useRef(null);
+    const [isLongPressing, setIsLongPressing] = useState(false);
+    const [dragStartX, setDragStartX] = useState(0);
+    const [scrollStartX, setScrollStartX] = useState(0);
+    const longPressTimer = useRef(null);
+    const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+
+    const getScrollPosition = () => {
+        if (Platform.OS === 'web') {
+            const scrollViewNode = scrollViewRef.current;
+            if (scrollViewNode && scrollViewNode.scrollLeft !== undefined) {
+                return scrollViewNode.scrollLeft;
+            }
+        }
+        return scrollViewRef.current?.scrollResponder?.getScrollableNode()?.scrollLeft || 0;
+    };
+
+    const setScrollPosition = (x) => {
+        if (Platform.OS === 'web') {
+            const scrollViewNode = scrollViewRef.current;
+            if (scrollViewNode && scrollViewNode.scrollLeft !== undefined) {
+                scrollViewNode.scrollLeft = x;
+            }
+        } else {
+            scrollViewRef.current?.scrollTo({ x, animated: false });
+        }
+    };
+
+    // Scroll to end on initial load to show latest dates on the right
+    useEffect(() => {
+        if (!isInitialScrollDone && scrollViewRef.current && data && data.length > 0) {
+            setTimeout(() => {
+                if (Platform.OS === 'web') {
+                    const scrollViewNode = scrollViewRef.current;
+                    if (scrollViewNode && scrollViewNode.scrollWidth !== undefined) {
+                        scrollViewNode.scrollLeft = scrollViewNode.scrollWidth;
+                    }
+                } else {
+                    scrollViewRef.current?.scrollToEnd({ animated: false });
+                }
+                setIsInitialScrollDone(true);
+            }, 100);
+        }
+    }, [data, isInitialScrollDone]);
+
+    const handleDragStart = (clientX) => {
+        setDragStartX(clientX);
+        setScrollStartX(getScrollPosition());
+        
+        longPressTimer.current = setTimeout(() => {
+            setIsLongPressing(true);
+        }, 300);
+    };
+
+    const handleDragMove = (clientX) => {
+        if (!isLongPressing) return;
+        
+        const deltaX = clientX - dragStartX;
+        const newScrollX = scrollStartX - deltaX;
+        setScrollPosition(Math.max(0, newScrollX));
+    };
+
+    const handleDragEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+        }
+        setIsLongPressing(false);
+    };
+
+    const onMouseDown = (e) => {
+        e.preventDefault();
+        handleDragStart(e.clientX);
+    };
+
+    const onMouseMove = (e) => {
+        if (!isLongPressing) return;
+        handleDragMove(e.clientX);
+    };
+
+    const onMouseUp = () => {
+        handleDragEnd();
+    };
+
+    const onTouchStart = (e) => {
+        const touch = e.touches[0];
+        handleDragStart(touch.clientX);
+    };
+
+    const onTouchMove = (e) => {
+        if (!isLongPressing) return;
+        const touch = e.touches[0];
+        handleDragMove(touch.clientX);
+    };
+
+    const onTouchEnd = () => {
+        handleDragEnd();
+    };
+
+    const dragProps = Platform.OS === 'web' 
+        ? {
+            onMouseDown,
+            onMouseMove,
+            onMouseUp,
+            onMouseLeave: onMouseUp,
+          }
+        : {
+            onTouchStart,
+            onTouchMove,
+            onTouchEnd,
+            onTouchCancel: onTouchEnd,
+          };
+
+    return (
+        <View style={styles.horizontalScrollContainer}>
+            <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalBarsWrapper}
+                scrollEnabled={false}
+                {...dragProps}
+            >
+                {children}
+            </ScrollView>
+        </View>
+    );
 };
 
 // Function to generate unique ID for Sensor Logs
@@ -271,7 +383,7 @@ const NutrientBars = ({ nitrogen, phosphorus, potassium }) => {
     );
 };
 
-// Crop Health Bar Graph Component
+// Crop Health Bar Graph Component - WITH HORIZONTAL SCROLLING FOR DAILY VIEW
 const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const animatedHeights = useRef([]);
@@ -289,40 +401,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
             const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
             
             const result = hours.map(hour => {
-                let valueInPesos = 0;
-                
-                if (hour === 16) {
-                    valueInPesos = getDataForHour(todayData, 16);
-                } else if (hour === 17) {
-                    const data5PM = todayData.filter(item => {
-                        const date = new Date(item.created_at);
-                        return isTimeInRange(date, 16, 40, 17, 30);
-                    });
-                    if (data5PM.length > 0) {
-                        const bestData = data5PM.reduce((latest, current) => {
-                            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-                        });
-                        const total = (parseInt(bestData.unripe) || 0) + 
-                                     (parseInt(bestData['semi-ripe']) || 0) + 
-                                     (parseInt(bestData.ripe) || 0);
-                        valueInPesos = total * 15;
-                    }
-                } else {
-                    const hourData = todayData.filter(item => {
-                        const date = new Date(item.created_at);
-                        const hours = date.getHours();
-                        return hours === hour;
-                    });
-                    if (hourData.length > 0) {
-                        const bestData = hourData.reduce((latest, current) => {
-                            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-                        });
-                        const total = (parseInt(bestData.unripe) || 0) + 
-                                     (parseInt(bestData['semi-ripe']) || 0) + 
-                                     (parseInt(bestData.ripe) || 0);
-                        valueInPesos = total * 15;
-                    }
-                }
+                // Use the fixed getDataForHour function for all hours
+                let valueInPesos = getDataForHour(todayData, hour);
                 
                 let label = '';
                 if (hour === 7) label = '7AM';
@@ -340,13 +420,19 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
                 return {
                     label: isSmall ? (hour === 12 ? '12P' : label.replace('AM', '').replace('PM', '')) : label,
                     value: valueInPesos,
-                    hour
+                    hour,
+                    hasData: valueInPesos > 0
                 };
             });
 
-            return result.map((item, index) => {
+            // Filter out hours with no data - only show bars that have data
+            const filteredResult = result.filter(item => item.hasData);
+            
+            if (filteredResult.length === 0) return [];
+
+            return filteredResult.map((item, index) => {
                 if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                const prevValue = filteredResult[index - 1].value;
                 const currentValue = item.value;
                 const highlight = currentValue > prevValue;
                 return { ...item, highlight };
@@ -372,10 +458,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
                 }
             });
 
-            const datesWithData = Object.keys(dailyValues)
-                .sort()
-                .reverse()
-                .slice(0, 7);
+            // Sort dates in ascending order (oldest to newest) - this will show all dates with data
+            const datesWithData = Object.keys(dailyValues).sort();
             
             const result = datesWithData.map(dayKey => {
                 const date = new Date(dayKey);
@@ -387,18 +471,29 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
                     label: isSmall ? monthDay.substring(0, 3) : monthDay,
                     value: modeValue,
                     dayKey,
-                    fullDate: date
+                    fullDate: date,
+                    hasData: modeValue > 0
                 };
-            }).reverse();
+            });
 
             if (result.length === 0) {
                 return [];
             }
 
+            // FIXED: First date bar should be GREEN
+            // Then: if current value is LOWER than previous -> BLACK
+            //       if current value is SAME as previous -> BLACK  
+            //       if current value is HIGHER than previous -> GREEN
+            // Note: We compare with previous bar (index-1), not next bar
             return result.map((item, index) => {
-                if (index === 0) return { ...item, highlight: true };
+                // First bar is always green
+                if (index === 0) {
+                    return { ...item, highlight: true };
+                }
+                // Compare with previous bar's value
                 const prevValue = result[index - 1].value;
                 const currentValue = item.value;
+                // Green only if current is greater than previous
                 const highlight = currentValue > prevValue;
                 return { ...item, highlight };
             });
@@ -434,7 +529,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
                 
                 return {
                     label: isSmall ? weekKey.replace('Week ', 'W') : weekKey,
-                    value: modeValue
+                    value: modeValue,
+                    hasData: modeValue > 0
                 };
             });
 
@@ -443,10 +539,10 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
             }
 
             return result.map((item, index) => {
-                if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                if (index === result.length - 1) return { ...item, highlight: true };
+                const nextValue = result[index + 1].value;
                 const currentValue = item.value;
-                const highlight = currentValue > prevValue;
+                const highlight = currentValue > nextValue;
                 return { ...item, highlight };
             });
         }
@@ -531,15 +627,234 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
         );
     }
 
+    if (activeFilter === 'Today' && data.length === 0) {
+        return (
+            <View style={styles.cropHealthContainer}>
+                <View style={styles.cropHealthHeader}>
+                    <View>
+                        <Text style={styles.cropHealthTitle}>Crop Health Revenue</Text>
+                        <Text style={styles.cropHealthSubtitle}>Revenue Analysis (₱)</Text>
+                    </View>
+                    <View>
+                        <TouchableOpacity 
+                            style={styles.cropDropdownMini} 
+                            onPress={() => setShowDropdown(!showDropdown)}
+                        >
+                            <Text style={styles.cropDropdownText}>{activeFilter}</Text>
+                            <Icon name="chevron-down" size={14} color="#64748B" />
+                        </TouchableOpacity>
+                        {showDropdown && (
+                            <View style={styles.cropDropdownMenu}>
+                                {FILTERS.map(f => (
+                                    <TouchableOpacity 
+                                        key={f} 
+                                        style={styles.cropDropdownItem} 
+                                        onPress={() => { setActiveFilter(f); setShowDropdown(false); }}
+                                    >
+                                        <Text style={[styles.cropDropdownItemText, activeFilter === f && {color: '#10B981'}]}>{f}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+                <View style={styles.noDataContainer}>
+                    <Icon name="calendar-blank" size={40} color="#CBD5E1" />
+                    <Text style={styles.noDataText}>No data available for today</Text>
+                    <Text style={styles.noDataSubtext}>No readings recorded between 7AM - 5PM</Text>
+                </View>
+            </View>
+        );
+    }
+
+    // For Today view, use the regular layout with proper Y-axis line going all the way down
+    if (activeFilter === 'Today') {
+        return (
+            <View style={styles.cropHealthContainer}>
+                <View style={styles.cropHealthHeader}>
+                    <View>
+                        <Text style={styles.cropHealthTitle}>Crop Health Revenue</Text>
+                        <Text style={styles.cropHealthSubtitle}>
+                            {currentDateString} - Hours with Data
+                        </Text>
+                    </View>
+                    
+                    <View>
+                        <TouchableOpacity 
+                            style={styles.cropDropdownMini} 
+                            onPress={() => setShowDropdown(!showDropdown)}
+                        >
+                            <Text style={styles.cropDropdownText}>{activeFilter}</Text>
+                            <Icon name="chevron-down" size={14} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {showDropdown && (
+                            <View style={styles.cropDropdownMenu}>
+                                {FILTERS.map(f => (
+                                    <TouchableOpacity 
+                                        key={f} 
+                                        style={styles.cropDropdownItem} 
+                                        onPress={() => { setActiveFilter(f); setShowDropdown(false); }}
+                                    >
+                                        <Text style={[styles.cropDropdownItemText, activeFilter === f && {color: '#10B981'}]}>{f}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                <View style={styles.cropGraphContent}>
+                    <View style={styles.cropYAxis}>
+                        <Text style={styles.cropAxisText}>₱{maxValue}</Text>
+                        <Text style={styles.cropAxisText}>₱{Math.round(maxValue * 0.75)}</Text>
+                        <Text style={styles.cropAxisText}>₱{Math.round(maxValue * 0.5)}</Text>
+                        <Text style={styles.cropAxisText}>₱{Math.round(maxValue * 0.25)}</Text>
+                        <Text style={styles.cropAxisText}>₱0</Text>
+                    </View>
+
+                    <View style={styles.cropBarsContainer}>
+                        <View style={styles.cropBarsWrapper}>
+                            {data.map((item, index) => (
+                                <View key={index} style={styles.cropBarColumn}>
+                                    <View style={styles.cropBarWrapper}>
+                                        <Animated.View 
+                                            style={[
+                                                styles.cropBarPill, 
+                                                getAnimatedBarHeight(animatedHeights.current[index]),
+                                                { 
+                                                    backgroundColor: item.highlight ? '#22C55E' : '#2D2D2D',
+                                                }
+                                            ]} 
+                                        />
+                                    </View>
+                                    {item.value > 0 && !isSmall && (
+                                        <Text style={styles.cropBarValue}>₱{item.value.toLocaleString()}</Text>
+                                    )}
+                                    <Text style={styles.cropXAxisText}>{item.label}</Text>
+                                </View>
+                            ))}
+                        </View>
+                        {/* Y-axis vertical line that goes all the way down to the bottom */}
+                        <View style={styles.cropYAxisLine} />
+                    </View>
+                </View>
+
+                <View style={styles.cropStatsRow}>
+                    <View style={styles.cropStatBox}>
+                        <Text style={styles.cropStatValue}>₱{data.length > 0 ? data[data.length - 1]?.value || 0 : 0}</Text>
+                        <Text style={styles.cropStatLabel}>Latest</Text>
+                    </View>
+                    <View style={styles.cropStatBox}>
+                        <Text style={styles.cropStatValue}>₱{data.length > 0 ? Math.max(...data.map(d => d.value)) : 0}</Text>
+                        <Text style={styles.cropStatLabel}>Highest</Text>
+                    </View>
+                    <View style={styles.cropStatBox}>
+                        <Text style={styles.cropStatValue}>₱{data.length > 0 ? (data.reduce((sum, d) => sum + d.value, 0) / data.length).toFixed(0) : 0}</Text>
+                        <Text style={styles.cropStatLabel}>Average</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    // For Daily view, use horizontal scrollable container with proper alignment
+    if (activeFilter === 'Daily') {
+        return (
+            <View style={styles.cropHealthContainer}>
+                <View style={styles.cropHealthHeader}>
+                    <View>
+                        <Text style={styles.cropHealthTitle}>Crop Health Revenue</Text>
+                        <Text style={styles.cropHealthSubtitle}>
+                            Daily Mode Values (₱) - Latest on Right (Scroll Left for Past Dates)
+                        </Text>
+                    </View>
+                    
+                    <View>
+                        <TouchableOpacity 
+                            style={styles.cropDropdownMini} 
+                            onPress={() => setShowDropdown(!showDropdown)}
+                        >
+                            <Text style={styles.cropDropdownText}>{activeFilter}</Text>
+                            <Icon name="chevron-down" size={14} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {showDropdown && (
+                            <View style={styles.cropDropdownMenu}>
+                                {FILTERS.map(f => (
+                                    <TouchableOpacity 
+                                        key={f} 
+                                        style={styles.cropDropdownItem} 
+                                        onPress={() => { setActiveFilter(f); setShowDropdown(false); }}
+                                    >
+                                        <Text style={[styles.cropDropdownItemText, activeFilter === f && {color: '#10B981'}]}>{f}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                <View style={styles.cropGraphContent}>
+                    <View style={styles.cropYAxis}>
+                        <Text style={styles.cropAxisText}>₱{maxValue}</Text>
+                        <Text style={styles.cropAxisText}>₱{Math.round(maxValue * 0.75)}</Text>
+                        <Text style={styles.cropAxisText}>₱{Math.round(maxValue * 0.5)}</Text>
+                        <Text style={styles.cropAxisText}>₱{Math.round(maxValue * 0.25)}</Text>
+                        <Text style={styles.cropAxisText}>₱0</Text>
+                    </View>
+
+                    <View style={styles.cropBarsContainer}>
+                        <HorizontalDragScroll data={data} initialScrollToEnd={true}>
+                            {data.map((item, index) => (
+                                <View key={index} style={styles.cropBarColumnHorizontal}>
+                                    <View style={styles.cropBarWrapperHorizontal}>
+                                        <Animated.View 
+                                            style={[
+                                                styles.cropBarPillHorizontal, 
+                                                {
+                                                    height: getAnimatedBarHeight(animatedHeights.current[index]).height,
+                                                    backgroundColor: item.highlight ? '#22C55E' : '#2D2D2D',
+                                                }
+                                            ]} 
+                                        />
+                                    </View>
+                                    {item.value > 0 && (
+                                        <Text style={styles.cropBarValueHorizontal}>₱{item.value.toLocaleString()}</Text>
+                                    )}
+                                    <Text style={styles.cropXAxisTextHorizontal}>{item.label}</Text>
+                                </View>
+                            ))}
+                        </HorizontalDragScroll>
+                    </View>
+                </View>
+
+                <View style={styles.cropStatsRow}>
+                    <View style={styles.cropStatBox}>
+                        <Text style={styles.cropStatValue}>₱{data.length > 0 ? data[data.length - 1]?.value || 0 : 0}</Text>
+                        <Text style={styles.cropStatLabel}>Latest</Text>
+                    </View>
+                    <View style={styles.cropStatBox}>
+                        <Text style={styles.cropStatValue}>₱{data.length > 0 ? Math.max(...data.map(d => d.value)) : 0}</Text>
+                        <Text style={styles.cropStatLabel}>Highest</Text>
+                    </View>
+                    <View style={styles.cropStatBox}>
+                        <Text style={styles.cropStatValue}>₱{data.length > 0 ? (data.reduce((sum, d) => sum + d.value, 0) / data.length).toFixed(0) : 0}</Text>
+                        <Text style={styles.cropStatLabel}>Average</Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
+    // Weekly view
     return (
         <View style={styles.cropHealthContainer}>
             <View style={styles.cropHealthHeader}>
                 <View>
                     <Text style={styles.cropHealthTitle}>Crop Health Revenue</Text>
                     <Text style={styles.cropHealthSubtitle}>
-                        {activeFilter === 'Today' ? currentDateString : 
-                         activeFilter === 'Daily' ? 'Daily Mode Values (₱) - Last 7 Days With Data' : 
-                         'Revenue Analysis (₱) - Weeks With Data'}
+                        Revenue Analysis (₱) - Weeks With Data (Latest on Right)
                     </Text>
                 </View>
                 
@@ -593,14 +908,10 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, allBellPepperData }
                                     />
                                 </View>
                                 {item.value > 0 && !isSmall && (
-                                    <Text style={styles.cropBarValue}>₱{item.value}</Text>
+                                    <Text style={styles.cropBarValue}>₱{item.value.toLocaleString()}</Text>
                                 )}
+                                <Text style={styles.cropXAxisText}>{item.label}</Text>
                             </View>
-                        ))}
-                    </View>
-                    <View style={styles.cropXAxis}>
-                        {data.map((item, index) => (
-                            <Text key={index} style={styles.cropXAxisText}>{item.label}</Text>
                         ))}
                     </View>
                 </View>
@@ -749,15 +1060,7 @@ const GraphModal = ({ visible, onClose, title, data, unit, color, icon, currentV
                                         
                                         {yLabels.map(val => (
                                             <G key={val}>
-                                                <Line 
-                                                    x1={LEFT_MARGIN} 
-                                                    y1={getYPos(val, maxChartValue)} 
-                                                    x2={chartLayout.width - RIGHT_MARGIN} 
-                                                    y2={getYPos(val, maxChartValue)} 
-                                                    stroke="#E2E8F0" 
-                                                    strokeWidth="0.5" 
-                                                    strokeDasharray="4 4"
-                                                />
+                                                
                                                 <SvgText 
                                                     x={LEFT_MARGIN - 8} 
                                                     y={getYPos(val, maxChartValue) + 4} 
@@ -800,17 +1103,7 @@ const GraphModal = ({ visible, onClose, title, data, unit, color, icon, currentV
                                                     strokeLinejoin="round"
                                                     strokeLinecap="round"
                                                 />
-                                                {points.map((point, idx) => (
-                                                    <Circle
-                                                        key={idx}
-                                                        cx={point.x}
-                                                        cy={point.y}
-                                                        r="3"
-                                                        fill={color}
-                                                        stroke="#FFF"
-                                                        strokeWidth="1.5"
-                                                    />
-                                                ))}
+                                                
                                             </>
                                         )}
 
@@ -822,15 +1115,7 @@ const GraphModal = ({ visible, onClose, title, data, unit, color, icon, currentV
                                             
                                             return (
                                                 <G>
-                                                    <Line 
-                                                        x1={x} 
-                                                        y1={TOP_PADDING} 
-                                                        x2={x} 
-                                                        y2={GRAPH_HEIGHT + TOP_PADDING} 
-                                                        stroke={color} 
-                                                        strokeWidth="1" 
-                                                        strokeDasharray="3 3" 
-                                                    />
+                                                    
                                                     <Circle 
                                                         cx={x} 
                                                         cy={y} 
@@ -1009,6 +1294,8 @@ export default function Reports() {
     // Responsive breakpoints
     const { width: windowWidth } = useWindowDimensions();
     const isVerySmall = windowWidth < 500;
+    // Add a breakpoint for mobile screens (e.g., less than 768px for tablets/phones)
+    const isSmallScreen = windowWidth < 768;
 
     const handleLayout = (e) => {
         const newWidth = e.nativeEvent.layout.width;
@@ -1389,38 +1676,40 @@ export default function Reports() {
                     <Text style={styles.noDataText}>No sensor logs available</Text>
                 </View>
             ) : (
-                sensorLogs.map((log, index) => {
-                    const logDate = new Date(log.created_at);
-                    const generatedId = generateSensorLogId(log.sensor_name, logDate, index);
-                    
-                    return (
-                        <View key={log.id || index} style={[styles.sensorLogRow, index === sensorLogs.length - 1 && { borderBottomWidth: 0 }]}>
-                            <View style={styles.sensorIconContainer}>
-                                <View style={[styles.sensorIconCircle, { backgroundColor: getSensorColor(log.sensor_name) + '15' }]}>
-                                    <Icon name={getSensorIcon(log.sensor_name)} size={20} color={getSensorColor(log.sensor_name)} />
-                                </View>
-                            </View>
-                            <View style={styles.sensorLogContent}>
-                                <View style={styles.sensorLogHeader}>
-                                    <View style={styles.sensorLogTitleRow}>
-                                        <Text style={styles.sensorLogName}>{log.sensor_name}</Text>
-                                        <View style={styles.sensorLogIdBadge}>
-                                            <Text style={styles.sensorLogIdText}>{generatedId}</Text>
-                                        </View>
+                <ScrollView style={styles.sensorLogsScrollView} showsVerticalScrollIndicator={false}>
+                    {sensorLogs.map((log, index) => {
+                        const logDate = new Date(log.created_at);
+                        const generatedId = generateSensorLogId(log.sensor_name, logDate, index);
+                        
+                        return (
+                            <View key={log.id || index} style={[styles.sensorLogRow, index === sensorLogs.length - 1 && { borderBottomWidth: 0 }]}>
+                                <View style={styles.sensorIconContainer}>
+                                    <View style={[styles.sensorIconCircle, { backgroundColor: getSensorColor(log.sensor_name) + '15' }]}>
+                                        <Icon name={getSensorIcon(log.sensor_name)} size={20} color={getSensorColor(log.sensor_name)} />
                                     </View>
-                                    <Text style={styles.sensorLogDate}>{formatDateForDisplay(log.created_at)}</Text>
                                 </View>
-                                <Text style={styles.sensorLogDescription} numberOfLines={2}>
-                                    {log.description}
-                                </Text>
-                                <View style={styles.sensorLogTimeRow}>
-                                    <Icon name="clock-outline" size={10} color="#94A3B8" />
-                                    <Text style={styles.sensorLogTime}>{formatTimeForDisplay(log.created_at)}</Text>
+                                <View style={styles.sensorLogContent}>
+                                    <View style={styles.sensorLogHeader}>
+                                        <View style={styles.sensorLogTitleRow}>
+                                            <Text style={styles.sensorLogName}>{log.sensor_name}</Text>
+                                            <View style={styles.sensorLogIdBadge}>
+                                                <Text style={styles.sensorLogIdText}>{generatedId}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.sensorLogDate}>{formatDateForDisplay(log.created_at)}</Text>
+                                    </View>
+                                    <Text style={styles.sensorLogDescription} numberOfLines={2}>
+                                        {log.description}
+                                    </Text>
+                                    <View style={styles.sensorLogTimeRow}>
+                                        <Icon name="clock-outline" size={10} color="#94A3B8" />
+                                        <Text style={styles.sensorLogTime}>{formatTimeForDisplay(log.created_at)}</Text>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    );
-                })
+                        );
+                    })}
+                </ScrollView>
             )}
         </View>
     );
@@ -1435,44 +1724,46 @@ export default function Reports() {
                     <Text style={styles.noDataSubtext}>Environment is clear</Text>
                 </View>
             ) : (
-                pestLogs.map((pest, index) => {
-                    const pestDate = new Date(pest.created_at);
-                    const generatedId = generatePestLogId(pest.insect_name, pestDate, index);
-                    
-                    return (
-                        <View key={pest.id || index} style={[styles.pestLogRow, index === pestLogs.length - 1 && { borderBottomWidth: 0 }]}>
-                            <View style={styles.pestIconContainer}>
-                                <View style={[styles.pestIconCircle, { backgroundColor: getPestColor(pest.insect_name) + '15' }]}>
-                                    <Icon name={getPestIcon(pest.insect_name)} size={20} color={getPestColor(pest.insect_name)} />
+                <ScrollView style={styles.pestLogsScrollView} showsVerticalScrollIndicator={true}>
+                    {pestLogs.map((pest, index) => {
+                        const pestDate = new Date(pest.created_at);
+                        const generatedId = generatePestLogId(pest.insect_name, pestDate, index);
+                        
+                        return (
+                            <View key={pest.id || index} style={[styles.pestLogRow, index === pestLogs.length - 1 && { borderBottomWidth: 0 }]}>
+                                <View style={styles.pestIconContainer}>
+                                    <View style={[styles.pestIconCircle, { backgroundColor: getPestColor(pest.insect_name) + '15' }]}>
+                                        <Icon name={getPestIcon(pest.insect_name)} size={20} color={getPestColor(pest.insect_name)} />
+                                    </View>
                                 </View>
-                            </View>
-                            <View style={styles.pestLogContent}>
-                                <View style={styles.pestLogHeader}>
-                                    <View style={styles.pestLogTitleRow}>
-                                        <Text style={styles.pestLogName}>{pest.insect_name}</Text>
-                                        <View style={styles.pestLogIdBadge}>
-                                            <Text style={styles.pestLogIdText}>{generatedId}</Text>
+                                <View style={styles.pestLogContent}>
+                                    <View style={styles.pestLogHeader}>
+                                        <View style={styles.pestLogTitleRow}>
+                                            <Text style={styles.pestLogName}>{pest.insect_name}</Text>
+                                            <View style={styles.pestLogIdBadge}>
+                                                <Text style={styles.pestLogIdText}>{generatedId}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.pestLogDate}>{formatDateForDisplay(pest.created_at)}</Text>
+                                    </View>
+                                    <Text style={styles.pestLogDescription} numberOfLines={2}>
+                                        {pest.description}
+                                    </Text>
+                                    <View style={styles.pestLogFooter}>
+                                        <View style={styles.pestCountContainer}>
+                                            <Icon name="counter" size={10} color="#EF4444" />
+                                            <Text style={styles.pestCountText}>Count: {pest.counts}</Text>
+                                        </View>
+                                        <View style={styles.pestLogTimeRow}>
+                                            <Icon name="clock-outline" size={10} color="#94A3B8" />
+                                            <Text style={styles.pestLogTime}>{formatTimeForDisplay(pest.created_at)}</Text>
                                         </View>
                                     </View>
-                                    <Text style={styles.pestLogDate}>{formatDateForDisplay(pest.created_at)}</Text>
-                                </View>
-                                <Text style={styles.pestLogDescription} numberOfLines={2}>
-                                    {pest.description}
-                                </Text>
-                                <View style={styles.pestLogFooter}>
-                                    <View style={styles.pestCountContainer}>
-                                        <Icon name="counter" size={10} color="#EF4444" />
-                                        <Text style={styles.pestCountText}>Count: {pest.counts}</Text>
-                                    </View>
-                                    <View style={styles.pestLogTimeRow}>
-                                        <Icon name="clock-outline" size={10} color="#94A3B8" />
-                                        <Text style={styles.pestLogTime}>{formatTimeForDisplay(pest.created_at)}</Text>
-                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    );
-                })
+                        );
+                    })}
+                </ScrollView>
             )}
         </View>
     );
@@ -1493,23 +1784,42 @@ export default function Reports() {
                     </View>
                 </View>
 
-                <ScrollView 
-                    contentContainerStyle={styles.content}
-                    showsVerticalScrollIndicator={false}
-                    showsHorizontalScrollIndicator={false}
-                >
-                    {loading && activeTab === 'General Reports' ? (
-                        <View style={styles.loadingContainer}>
-                            <ActivityIndicator size="large" color="#10B981" />
-                        </View>
-                    ) : (
-                        <>
-                            {activeTab === 'General Reports' && renderGeneralReports()}
-                            {activeTab === 'Sensor Logs' && renderSensorLogs()}
-                            {activeTab === 'Pest Logs' && renderPestLogs()}
-                        </>
-                    )}
-                </ScrollView>
+                {/* Conditionally use View (no scroll on big screens) or ScrollView (scroll on small screens) */}
+                {!isSmallScreen ? (
+                    // When screen is big - use View (not scrollable)
+                    <View style={styles.content}>
+                        {loading && activeTab === 'General Reports' ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color="#10B981" />
+                            </View>
+                        ) : (
+                            <>
+                                {activeTab === 'General Reports' && renderGeneralReports()}
+                                {activeTab === 'Sensor Logs' && renderSensorLogs()}
+                                {activeTab === 'Pest Logs' && renderPestLogs()}
+                            </>
+                        )}
+                    </View>
+                ) : (
+                    // When screen is small - use ScrollView (scrollable)
+                    <ScrollView 
+                        contentContainerStyle={styles.content}
+                        showsVerticalScrollIndicator={false}
+                        showsHorizontalScrollIndicator={false}
+                    >
+                        {loading && activeTab === 'General Reports' ? (
+                            <View style={styles.loadingContainer}>
+                                <ActivityIndicator size="large" color="#10B981" />
+                            </View>
+                        ) : (
+                            <>
+                                {activeTab === 'General Reports' && renderGeneralReports()}
+                                {activeTab === 'Sensor Logs' && renderSensorLogs()}
+                                {activeTab === 'Pest Logs' && renderPestLogs()}
+                            </>
+                        )}
+                    </ScrollView>
+                )}
             </View>
 
             {/* Graph Modal */}
@@ -1539,21 +1849,33 @@ const styles = StyleSheet.create({
     activeTab: { borderBottomWidth: 3, borderBottomColor: '#10B981' },
     tabText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
     activeTabText: { color: '#1E293B' },
-    content: { padding: 20, paddingTop: 10, paddingBottom: 40 },
+    content: { padding: 20, paddingTop: 10, paddingBottom: 100 },
 
-    loadingContainer: { height: 400, justifyContent: 'center', alignItems: 'center' },
+    loadingContainer: { height: 400, justifyContent: 'center', alignItems: 'center',padding: 20, paddingTop: 10, paddingBottom: 40 },
 
-    whiteCard: { 
-        backgroundColor: '#FFF', 
-        borderRadius: 20, 
-        padding: 16, 
-        marginBottom: 20,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 5,
-        borderWidth: 1,
-        borderColor: '#F1F5F9'
+whiteCard: { 
+    backgroundColor: '#FFF', 
+    borderRadius: 20, 
+    padding: 16, 
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    height: 600, // Change from fixed height to auto
+    marginBottom: 30, // Added bottom margin
+},
+
+    // Scrollable container for Sensor Logs
+    sensorLogsScrollView: {
+        maxHeight: 550, // Compact height with internal scrolling
+    },
+
+    // Scrollable container for Pest Logs
+    pestLogsScrollView: {
+        maxHeight: 550, // Compact height with internal scrolling
     },
 
     // New Metric Cards Row
@@ -1824,7 +2146,7 @@ const styles = StyleSheet.create({
         minWidth: 45,
     },
 
-    // Crop Health Styles
+    // Crop Health Styles - WITH HORIZONTAL SCROLLING AND PROPER Y-AXIS ALIGNMENT
     cropHealthContainer: {
         backgroundColor: '#FFF',
         borderRadius: 20,
@@ -1871,30 +2193,74 @@ const styles = StyleSheet.create({
     },
     cropDropdownItem: { padding: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
     cropDropdownItemText: { fontSize: 12, color: '#1E293B' },
-    cropGraphContent: { flexDirection: 'row', height: 160, marginBottom: 8 },
-    cropYAxis: { width: 45, justifyContent: 'space-between', paddingBottom: 20, alignItems: 'flex-end', paddingRight: 8 },
+    cropGraphContent: { flexDirection: 'row', minHeight: 160, marginBottom: 8, position: 'relative' },
+    cropYAxis: { width: 55, justifyContent: 'space-between', paddingBottom: 20, alignItems: 'flex-end', paddingRight: 8 },
     cropAxisText: { fontSize: 9, color: '#94A3B8', fontWeight: 'bold' },
-    cropBarsContainer: { flex: 1, flexDirection: 'column' },
+    cropBarsContainer: { flex: 1, flexDirection: 'column', overflow: 'hidden', position: 'relative' },
     cropBarsWrapper: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'flex-end',
         justifyContent: 'space-around',
-        borderLeftWidth: 1,
         borderBottomWidth: 1,
-        borderColor: '#F1F5F9',
+        borderBottomColor: '#E2E8F0',
         minHeight: 110,
+        paddingBottom: 4,
     },
-    cropBarColumn: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%' },
+    // Y-axis vertical line that goes all the way down to the bottom
+    cropYAxisLine: {
+        position: 'absolute',
+        left: -48,
+        top: 0,
+        bottom: -24,
+        width: 1,
+        backgroundColor: '#E2E8F0',
+    },
+    cropBarColumn: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: '100%', minWidth: 60 },
+    cropBarColumnHorizontal: { 
+        alignItems: 'center', 
+        justifyContent: 'flex-end', 
+        minWidth: 80, 
+        marginHorizontal: 4,
+        height: '100%',
+    },
     cropBarWrapper: { width: '100%', alignItems: 'center', justifyContent: 'flex-end', flex: 1, minHeight: 80 },
-    cropBarPill: { width: 13, borderRadius: 50, minHeight: 3, alignSelf: 'center' },
-    cropBarValue: { fontSize: 7, color: '#64748B', marginTop: 3, fontWeight: '600', textAlign: 'center' },
-    cropXAxis: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 },
-    cropXAxisText: { fontSize: 8, color: '#94A3B8', textAlign: 'center', width: 35 },
+    cropBarWrapperHorizontal: { 
+        alignItems: 'center', 
+        justifyContent: 'flex-end', 
+        height: 120, 
+        width: 15,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
+        marginBottom: 4,
+    },
+    cropBarPill: { width: 15, borderRadius: 50, minHeight: 5, alignSelf: 'center' },
+    cropBarPillHorizontal: { width: 15, borderRadius: 50, minHeight: 5, alignSelf: 'center', position: 'absolute', bottom: 0 },
+    cropBarValue: { fontSize: 8, color: '#64748B', marginTop: 4, fontWeight: '600', textAlign: 'center' },
+    cropBarValueHorizontal: { fontSize: 8, color: '#64748B', marginTop: 6, fontWeight: '600', textAlign: 'center' },
+    cropXAxisText: { fontSize: 9, color: '#94A3B8', textAlign: 'center', marginTop: 6, width: 55 },
+    cropXAxisTextHorizontal: { fontSize: 9, color: '#94A3B8', textAlign: 'center', marginTop: 6, width: 70 },
     cropStatsRow: { flexDirection: 'row', gap: 8, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
     cropStatBox: { flex: 1, backgroundColor: '#F8FAFC', paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
     cropStatValue: { fontWeight: '800', color: '#1E293B', fontSize: 12 },
     cropStatLabel: { color: '#94A3B8', fontWeight: '600', fontSize: 9, marginTop: 2 },
+
+    // Horizontal scroll styles
+    horizontalScrollContainer: {
+        flex: 1,
+        overflow: 'hidden',
+        cursor: 'grab',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+    },
+    horizontalBarsWrapper: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        paddingHorizontal: 10,
+        gap: 20,
+        minWidth: '100%',
+        height: 160,
+    },
 
     noDataContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
     noDataText: { fontSize: 14, fontWeight: '600', color: '#64748B', marginTop: 10 },

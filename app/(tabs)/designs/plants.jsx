@@ -91,7 +91,14 @@ const isTimeInRange = (date, startHour, startMinute, endHour, endMinute) => {
     return timeInMinutes >= startInMinutes && timeInMinutes <= endInMinutes;
 };
 
-// Function to get data for a specific hour with fallback logic
+// Function to calculate total peppers (excluding reject)
+const calculateTotalPeppers = (data) => {
+    return (parseInt(data.unripe) || 0) + 
+           (parseInt(data['semi-ripe']) || 0) + 
+           (parseInt(data.ripe) || 0);
+};
+
+// Function to get data for a specific hour - FIXED: gets FIRST data in range, not latest
 const getDataForHour = (todayData, targetHour) => {
     const hourRanges = {
         7: { 
@@ -135,14 +142,15 @@ const getDataForHour = (todayData, targetHour) => {
             fallback: { startHour: 15, startMinute: 40, endHour: 16, endMinute: 0 }
         },
         17: { 
-            primary: { startHour: 16, startMinute: 40, endHour: 17, endMinute: 30 },
-            fallback: { startHour: 16, startMinute: 0, endHour: 16, endMinute: 40 }
+            primary: { startHour: 17, startMinute: 0, endHour: 17, endMinute: 30 },
+            fallback: { startHour: 16, startMinute: 40, endHour: 17, endMinute: 0 }
         },
     };
     
     const range = hourRanges[targetHour];
     if (!range) return 0;
     
+    // Check primary range first (e.g., 7:00-7:39 for 7AM)
     const primaryData = todayData.filter(item => {
         const date = new Date(item.created_at);
         return isTimeInRange(date, 
@@ -152,15 +160,16 @@ const getDataForHour = (todayData, targetHour) => {
     });
     
     if (primaryData.length > 0) {
-        const bestData = primaryData.reduce((latest, current) => {
-            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
+        // Get the FIRST (earliest) data in the primary range
+        const firstData = primaryData.reduce((earliest, current) => {
+            return new Date(current.created_at) < new Date(earliest.created_at) ? current : earliest;
         });
-        const total = (parseInt(bestData.unripe) || 0) + 
-                     (parseInt(bestData['semi-ripe']) || 0) + 
-                     (parseInt(bestData.ripe) || 0);
-        return total * 15;
+        
+        const totalPeppers = calculateTotalPeppers(firstData);
+        return totalPeppers * 15;
     }
     
+    // If no data in primary range, check fallback range (previous hour's last 20 minutes)
     const fallbackData = todayData.filter(item => {
         const date = new Date(item.created_at);
         return isTimeInRange(date,
@@ -170,15 +179,16 @@ const getDataForHour = (todayData, targetHour) => {
     });
     
     if (fallbackData.length > 0) {
-        const bestData = fallbackData.reduce((latest, current) => {
-            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
+        // Get the FIRST (earliest) data in the fallback range
+        const firstData = fallbackData.reduce((earliest, current) => {
+            return new Date(current.created_at) < new Date(earliest.created_at) ? current : earliest;
         });
-        const total = (parseInt(bestData.unripe) || 0) + 
-                     (parseInt(bestData['semi-ripe']) || 0) + 
-                     (parseInt(bestData.ripe) || 0);
-        return total * 15;
+        
+        const totalPeppers = calculateTotalPeppers(firstData);
+        return totalPeppers * 15;
     }
     
+    // If no data in either range, return 0 (bar won't show)
     return 0;
 };
 
@@ -442,7 +452,137 @@ const RevenueInsights = ({ allBellPepperData }) => {
     );
 };
 
-// CROP HEALTH BAR GRAPH - MODIFIED TO ONLY SHOW HOURS WITH DATA FOR DAILY FILTER
+// Custom Horizontal Scroll Component with Mouse/Touch Drag Support
+const HorizontalDragScroll = ({ children, data, initialScrollToEnd = true }) => {
+    const scrollViewRef = useRef(null);
+    const [isLongPressing, setIsLongPressing] = useState(false);
+    const [dragStartX, setDragStartX] = useState(0);
+    const [scrollStartX, setScrollStartX] = useState(0);
+    const longPressTimer = useRef(null);
+    const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+
+    const getScrollPosition = () => {
+        if (Platform.OS === 'web') {
+            const scrollViewNode = scrollViewRef.current;
+            if (scrollViewNode && scrollViewNode.scrollLeft !== undefined) {
+                return scrollViewNode.scrollLeft;
+            }
+        }
+        return scrollViewRef.current?.scrollResponder?.getScrollableNode()?.scrollLeft || 0;
+    };
+
+    const setScrollPosition = (x) => {
+        if (Platform.OS === 'web') {
+            const scrollViewNode = scrollViewRef.current;
+            if (scrollViewNode && scrollViewNode.scrollLeft !== undefined) {
+                scrollViewNode.scrollLeft = x;
+            }
+        } else {
+            scrollViewRef.current?.scrollTo({ x, animated: false });
+        }
+    };
+
+    // Scroll to end on initial load to show latest dates on the right
+    useEffect(() => {
+        if (!isInitialScrollDone && scrollViewRef.current && data && data.length > 0) {
+            setTimeout(() => {
+                if (Platform.OS === 'web') {
+                    const scrollViewNode = scrollViewRef.current;
+                    if (scrollViewNode && scrollViewNode.scrollWidth !== undefined) {
+                        scrollViewNode.scrollLeft = scrollViewNode.scrollWidth;
+                    }
+                } else {
+                    scrollViewRef.current?.scrollToEnd({ animated: false });
+                }
+                setIsInitialScrollDone(true);
+            }, 100);
+        }
+    }, [data, isInitialScrollDone]);
+
+    const handleDragStart = (clientX) => {
+        setDragStartX(clientX);
+        setScrollStartX(getScrollPosition());
+        
+        longPressTimer.current = setTimeout(() => {
+            setIsLongPressing(true);
+        }, 300);
+    };
+
+    const handleDragMove = (clientX) => {
+        if (!isLongPressing) return;
+        
+        const deltaX = clientX - dragStartX;
+        const newScrollX = scrollStartX - deltaX;
+        setScrollPosition(Math.max(0, newScrollX));
+    };
+
+    const handleDragEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+        }
+        setIsLongPressing(false);
+    };
+
+    const onMouseDown = (e) => {
+        e.preventDefault();
+        handleDragStart(e.clientX);
+    };
+
+    const onMouseMove = (e) => {
+        if (!isLongPressing) return;
+        handleDragMove(e.clientX);
+    };
+
+    const onMouseUp = () => {
+        handleDragEnd();
+    };
+
+    const onTouchStart = (e) => {
+        const touch = e.touches[0];
+        handleDragStart(touch.clientX);
+    };
+
+    const onTouchMove = (e) => {
+        if (!isLongPressing) return;
+        const touch = e.touches[0];
+        handleDragMove(touch.clientX);
+    };
+
+    const onTouchEnd = () => {
+        handleDragEnd();
+    };
+
+    const dragProps = Platform.OS === 'web' 
+        ? {
+            onMouseDown,
+            onMouseMove,
+            onMouseUp,
+            onMouseLeave: onMouseUp,
+          }
+        : {
+            onTouchStart,
+            onTouchMove,
+            onTouchEnd,
+            onTouchCancel: onTouchEnd,
+          };
+
+    return (
+        <View style={styles.horizontalScrollContainer}>
+            <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalBarsWrapper}
+                scrollEnabled={false}
+                {...dragProps}
+            >
+                {children}
+            </ScrollView>
+        </View>
+    );
+};
+
+// CROP HEALTH BAR GRAPH WITH HORIZONTAL SCROLLING FOR DAILY VIEW - FIXED ALIGNMENT
 const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, allBellPepperData, onStatsUpdate }) => {
     const [showDropdown, setShowDropdown] = useState(false);
     const animatedHeights = useRef([]);
@@ -458,40 +598,7 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
             const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
             
             const result = hours.map(hour => {
-                let valueInPesos = 0;
-                
-                if (hour === 16) {
-                    valueInPesos = getDataForHour(todayData, 16);
-                } else if (hour === 17) {
-                    const data5PM = todayData.filter(item => {
-                        const date = new Date(item.created_at);
-                        return isTimeInRange(date, 16, 40, 17, 30);
-                    });
-                    if (data5PM.length > 0) {
-                        const bestData = data5PM.reduce((latest, current) => {
-                            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-                        });
-                        const total = (parseInt(bestData.unripe) || 0) + 
-                                     (parseInt(bestData['semi-ripe']) || 0) + 
-                                     (parseInt(bestData.ripe) || 0);
-                        valueInPesos = total * 15;
-                    }
-                } else {
-                    const hourData = todayData.filter(item => {
-                        const date = new Date(item.created_at);
-                        const hours = date.getHours();
-                        return hours === hour;
-                    });
-                    if (hourData.length > 0) {
-                        const bestData = hourData.reduce((latest, current) => {
-                            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-                        });
-                        const total = (parseInt(bestData.unripe) || 0) + 
-                                     (parseInt(bestData['semi-ripe']) || 0) + 
-                                     (parseInt(bestData.ripe) || 0);
-                        valueInPesos = total * 15;
-                    }
-                }
+                let valueInPesos = getDataForHour(todayData, hour);
                 
                 let label = '';
                 if (hour === 7) label = '7AM';
@@ -514,11 +621,12 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 };
             });
 
-            // Filter out hours with no data for Today view
+            // Filter out hours with no data - only show bars that have data
             const filteredResult = result.filter(item => item.hasData);
             
             if (filteredResult.length === 0) return [];
             
+            // Apply highlighting logic for trend indication
             return filteredResult.map((item, index) => {
                 if (index === 0) return { ...item, highlight: true };
                 const prevValue = filteredResult[index - 1].value;
@@ -547,9 +655,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                 }
             });
 
-            const datesWithData = Object.keys(dailyValues)
-                .sort()
-                .reverse();
+            // Sort dates in ascending order (oldest to newest)
+            const datesWithData = Object.keys(dailyValues).sort();
             
             const result = datesWithData.map(dayKey => {
                 const date = new Date(dayKey);
@@ -564,18 +671,17 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                     fullDate: date,
                     hasData: modeValue > 0
                 };
-            }).reverse();
+            });
 
             if (result.length === 0) {
                 return [];
             }
 
-            // For Daily view, show all dates (they all have data by definition)
             return result.map((item, index) => {
-                if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                if (index === result.length - 1) return { ...item, highlight: true };
+                const nextValue = result[index + 1].value;
                 const currentValue = item.value;
-                const highlight = currentValue > prevValue;
+                const highlight = currentValue > nextValue;
                 return { ...item, highlight };
             });
         } else {
@@ -620,10 +726,10 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
             }
 
             return result.map((item, index) => {
-                if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                if (index === result.length - 1) return { ...item, highlight: true };
+                const nextValue = result[index + 1].value;
                 const currentValue = item.value;
-                const highlight = currentValue > prevValue;
+                const highlight = currentValue > nextValue;
                 return { ...item, highlight };
             });
         }
@@ -772,6 +878,90 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
         );
     }
 
+    // For Daily view, use horizontal scrollable container with proper alignment
+if (activeFilter === 'Daily') {
+    // Calculate the maximum value for proper scaling
+    const maxValueForScaling = maxValue > 0 ? maxValue : 1000;
+    
+    return (
+        <View style={styles.barGraphContainer}>
+            <View style={styles.barGraphHeader}>
+                <View>
+                    <Text style={styles.graphTitleText}>Crop Health Revenue</Text>
+                    <Text style={styles.graphSubText}>
+                        Daily Mode Values (₱) - Latest on Right (Scroll Left for Past Dates)
+                    </Text>
+                </View>
+                
+                <View>
+                    <TouchableOpacity 
+                        style={styles.dropdownMini} 
+                        onPress={() => setShowDropdown(!showDropdown)}
+                    >
+                        <Text style={styles.dropdownText}>{activeFilter}</Text>
+                        <Icon name="chevron-down" size={16} color="#64748B" />
+                    </TouchableOpacity>
+
+                    {showDropdown && (
+                        <View style={styles.dropdownMenu}>
+                            {FILTERS.map(f => (
+                                <TouchableOpacity 
+                                    key={f} 
+                                    style={styles.dropdownItem} 
+                                    onPress={() => { setActiveFilter(f); setShowDropdown(false); }}
+                                >
+                                    <Text style={[styles.dropdownItemText, activeFilter === f && {color: '#10B981'}]}>{f}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    )}
+                </View>
+            </View>
+
+            <View style={styles.graphContent}>
+                <View style={styles.yAxis}>
+                    <Text style={styles.axisText}>₱{maxValueForScaling.toLocaleString()}</Text>
+                    <Text style={styles.axisText}>₱{Math.round(maxValueForScaling * 0.75).toLocaleString()}</Text>
+                    <Text style={styles.axisText}>₱{Math.round(maxValueForScaling * 0.5).toLocaleString()}</Text>
+                    <Text style={styles.axisText}>₱{Math.round(maxValueForScaling * 0.25).toLocaleString()}</Text>
+                    <Text style={styles.axisText}>₱0</Text>
+                </View>
+
+                <View style={styles.barsContainer}>
+                    <HorizontalDragScroll data={data} initialScrollToEnd={true}>
+                        {data.map((item, index) => {
+                            // Calculate the exact percentage height based on value vs max
+                            const heightPercent = (item.value / maxValueForScaling) * 115;
+                            // Cap at 100% and ensure minimum height for visibility if value > 0
+                            const finalHeightPercent = Math.min(115, Math.max(heightPercent, item.value > 0 ? 5 : 0));
+                            
+                            return (
+                                <View key={index} style={styles.barColumnHorizontal}>
+                                    <View style={styles.barWrapperHorizontal}>
+                                        <Animated.View 
+                                            style={[
+                                                styles.barPill, 
+                                                {
+                                                    height: `${finalHeightPercent}%`,
+                                                    backgroundColor: item.highlight ? '#22C55E' : '#2D2D2D',
+                                                }
+                                            ]} 
+                                        />
+                                    </View>
+                                    {item.value > 0 && (
+                                        <Text style={styles.barValue}>₱{item.value.toLocaleString()}</Text>
+                                    )}
+                                    <Text style={styles.xAxisText}>{item.label}</Text>
+                                </View>
+                            );
+                        })}
+                    </HorizontalDragScroll>
+                </View>
+            </View>
+        </View>
+    );
+}
+
     return (
         <View style={styles.barGraphContainer}>
             <View style={styles.barGraphHeader}>
@@ -779,8 +969,8 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                     <Text style={styles.graphTitleText}>Crop Health Revenue</Text>
                     <Text style={styles.graphSubText}>
                         {activeFilter === 'Today' ? `${currentDateString} - Hours with Data` : 
-                         activeFilter === 'Daily' ? 'Daily Mode Values (₱) - Days With Data' : 
-                         'Revenue Analysis (₱) - Weeks With Data'}
+                         activeFilter === 'Weekly' ? 'Revenue Analysis (₱) - Weeks With Data (Latest on Right)' : 
+                         'Revenue Analysis (₱)'}
                     </Text>
                 </View>
                 
@@ -834,14 +1024,10 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
                                     />
                                 </View>
                                 {item.value > 0 && (
-                                    <Text style={styles.barValue}>₱{item.value}</Text>
+                                    <Text style={styles.barValue}>₱{item.value.toLocaleString()}</Text>
                                 )}
+                                <Text style={styles.xAxisText}>{item.label}</Text>
                             </View>
-                        ))}
-                    </View>
-                    <View style={styles.xAxis}>
-                        {data.map((item, index) => (
-                            <Text key={index} style={styles.xAxisText}>{item.label}</Text>
                         ))}
                     </View>
                 </View>
@@ -850,7 +1036,7 @@ const CropHealthBarGraph = ({ activeFilter, setActiveFilter, bellPepperData, all
     );
 };
 
-// Nutrient Graph Modal Component - WITH GRADIENT FILL AREA (FIXED SHADOW COLOR)
+// Nutrient Graph Modal Component
 const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allSensorData }) => {
     const [chartLayout, setChartLayout] = useState({ width: 600, height: 400 });
     const [hoverData, setHoverData] = useState(null);
@@ -887,12 +1073,10 @@ const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allS
         }
     };
 
-    // Helper function to get a lighter version of the color for gradient
     const getGradientColor = () => {
         const color = getNutrientColor();
-        // For dark colors like #2D2D2D, we need a lighter gradient
         if (color === '#2D2D2D') {
-            return '#64748B'; // Lighter gray for gradient
+            return '#64748B';
         }
         return color;
     };
@@ -1065,19 +1249,16 @@ const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allS
             };
         });
         
-        // Build path string for the filled area (goes from line down to bottom, then back to start)
         let fillPathString = "";
         if (points.length > 0) {
             fillPathString = `M ${points[0].x} ${points[0].y}`;
             for (let i = 1; i < points.length; i++) {
                 fillPathString += ` L ${points[i].x} ${points[i].y}`;
             }
-            // Add bottom line and close
             fillPathString += ` L ${points[points.length - 1].x} ${GRAPH_HEIGHT + TOP_PADDING}`;
             fillPathString += ` L ${points[0].x} ${GRAPH_HEIGHT + TOP_PADDING} Z`;
         }
         
-        // Create smooth path for the line only
         const smoothPathData = createSmoothPathData(points);
         
         const latestValue = filteredData.length > 0 ? 
@@ -1104,7 +1285,6 @@ const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allS
                     parseFloat(d.soilaverage) || 0 : parseFloat(d[nutrientKey]) || 0
             )).toFixed(1) : '--';
 
-        // Create gradient ID based on nutrient type
         const gradientId = `nutrientGrad${nutrientType?.replace(/\s/g, '') || 'default'}`;
 
         return (
@@ -1197,14 +1377,12 @@ const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allS
 
                             {points.length > 1 && (
                                 <>
-                                    {/* GRADIENT FILL AREA (SHADOW UNDER THE LINE) - Uses lighter gradient color */}
                                     <AnimatedPath 
                                         d={fillPathString} 
                                         fill={`url(#${gradientId})`} 
                                         opacity={drawAnim} 
                                     />
                                     
-                                    {/* SMOOTH LINE PATH */}
                                     <AnimatedPath 
                                         d={smoothPathData} 
                                         fill="none" 
@@ -1214,19 +1392,6 @@ const NutrientGraphModal = ({ visible, onClose, nutrientType, nutrientData, allS
                                         strokeLinecap="round"
                                         opacity={drawAnim}
                                     />
-                                    
-                                    {/* DATA POINTS CIRCLES */}
-                                    {points.map((point, idx) => (
-                                        <Circle
-                                            key={idx}
-                                            cx={point.x}
-                                            cy={point.y}
-                                            r="5"
-                                            fill={color}
-                                            stroke="#FFF"
-                                            strokeWidth="2.5"
-                                        />
-                                    ))}
                                 </>
                             )}
 
@@ -1418,7 +1583,6 @@ export default function PlantsDashboard() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [availableDates, setAvailableDates] = useState([]);
 
-    // Nutrient Graph Modal States
     const [nutrientModalVisible, setNutrientModalVisible] = useState(false);
     const [selectedNutrient, setSelectedNutrient] = useState(null);
 
@@ -1812,15 +1976,7 @@ export default function PlantsDashboard() {
                                 
                                 return (
                                     <G>
-                                        <Line 
-                                            x1={x} 
-                                            y1={TOP_PADDING} 
-                                            x2={x} 
-                                            y2={GRAPH_HEIGHT + TOP_PADDING} 
-                                            stroke="#64748B" 
-                                            strokeWidth="1" 
-                                            strokeDasharray="4 3" 
-                                        />
+                                        
                                         
                                         <Rect 
                                             x={Math.max(LEFT_MARGIN, Math.min(x - 75, chartLayout.width - 170))}
@@ -2031,7 +2187,6 @@ export default function PlantsDashboard() {
         <View style={styles.colorindications}>
             <Text style={styles.sectionTitle}>Nutrients</Text>
             
-            {/* Nutrient Bars inside white box - NOW CLICKABLE */}
             <View style={styles.nutrientsBox}>
                 <View style={styles.nutrientsContainer}>
                     {NUTRIENT_DATA.map((item, i) => (
@@ -2061,11 +2216,9 @@ export default function PlantsDashboard() {
                 </View>
             </View>
 
-            {/* Soil Quality Monitor - Flexible Table with consistent spacing */}
             <View style={styles.soilQualityMonitorBox}>
                 <Text style={styles.logTitle}>Soil Quality Monitor</Text>
                 
-                {/* Table Header with consistent spacing */}
                 <View style={styles.tableHead}>
                     <Text style={[styles.th, styles.thParameter]}>Parameter</Text>
                     <Text style={[styles.th, styles.thLevel]}>Current Level</Text>
@@ -2073,7 +2226,6 @@ export default function PlantsDashboard() {
                     <Text style={[styles.th, styles.thStatus]}>Status</Text>
                 </View>
                 
-                {/* Nitrogen Row - CLICKABLE */}
                 <TouchableOpacity 
                     style={styles.tableRow}
                     onPress={() => handleNutrientPress('NITROGEN')}
@@ -2112,7 +2264,6 @@ export default function PlantsDashboard() {
                     </View>
                 </TouchableOpacity>
                 
-                {/* Phosphorus Row - CLICKABLE */}
                 <TouchableOpacity 
                     style={styles.tableRow}
                     onPress={() => handleNutrientPress('PHOSPHORUS')}
@@ -2151,7 +2302,6 @@ export default function PlantsDashboard() {
                     </View>
                 </TouchableOpacity>
                 
-                {/* Potassium Row - CLICKABLE */}
                 <TouchableOpacity 
                     style={styles.tableRow}
                     onPress={() => handleNutrientPress('POTASSIUM')}
@@ -2190,7 +2340,6 @@ export default function PlantsDashboard() {
                     </View>
                 </TouchableOpacity>
                 
-                {/* Soil Humidity Row - CLICKABLE */}
                 <TouchableOpacity 
                     style={styles.tableRow}
                     onPress={() => handleNutrientPress('SOIL HUMIDITY')}
@@ -2230,7 +2379,6 @@ export default function PlantsDashboard() {
                 </TouchableOpacity>
             </View>
             
-            {/* Nutrient Graph Modal */}
             <NutrientGraphModal 
                 visible={nutrientModalVisible}
                 onClose={() => setNutrientModalVisible(false)}
@@ -2531,14 +2679,14 @@ const styles = StyleSheet.create({
     graphSubText: { fontSize: 12, color: '#94A3B8' },
     graphContent: { flexDirection: 'row', height: 200 },
     yAxis: { 
-        width: 50, 
+        width: 65, 
         justifyContent: 'space-between', 
         paddingBottom: 25, 
         alignItems: 'flex-end', 
         paddingRight: 10 
     },
     axisText: { fontSize: 10, color: '#94A3B8', fontWeight: 'bold' },
-    barsContainer: { flex: 1, flexDirection: 'column' },
+    barsContainer: { flex: 1, flexDirection: 'column', overflow: 'hidden' },
     barsWrapper: {
         flex: 1,
         flexDirection: 'row',
@@ -2554,6 +2702,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-end',
         height: '100%',
+        minWidth: 60,
+    },
+    barColumnHorizontal: {
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        minWidth: 60,
+        marginHorizontal: 4,
     },
     barWrapper: {
         width: '100%',
@@ -2562,21 +2717,32 @@ const styles = StyleSheet.create({
         flex: 1,
         minHeight: 100,
     },
+    barWrapperHorizontal: {
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        height: 140,
+        minWidth: 40,
+    },
     barPill: {
-        width: 13,
+        width: 20,
         borderRadius: 50,
         minHeight: 5,
         alignSelf: 'center',
     },
     barValue: {
-        fontSize: 8,
+        fontSize: 9,
         color: '#64748B',
-        marginTop: 4,
+        marginTop: 6,
         fontWeight: '600',
         textAlign: 'center',
     },
-    xAxis: { flexDirection: 'row', justifyContent: 'space-around', marginTop: 10 },
-    xAxisText: { fontSize: 9, color: '#94A3B8', textAlign: 'center', width: 40 },
+    xAxisText: { 
+        fontSize: 10, 
+        color: '#94A3B8', 
+        textAlign: 'center', 
+        marginTop: 6,
+        fontWeight: '500',
+    },
     dropdownMini: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -2669,7 +2835,6 @@ const styles = StyleSheet.create({
         color: '#64748B',
         minWidth: 45,
     },   
-    // Soil Quality Monitor Box - Consistent spacing
     soilQualityMonitorBox: {
         backgroundColor: '#FFF',
         borderRadius: 24,
@@ -2855,7 +3020,6 @@ const styles = StyleSheet.create({
         borderColor: '#F1F5F9',
         width: '100%',
     },
-    // Nutrient Modal Styles - WIDER WITH GRADIENT FILL (FIXED)
     nutrientModalBox: {
         backgroundColor: '#FFF',
         borderRadius: 28,
@@ -2984,5 +3148,34 @@ const styles = StyleSheet.create({
         fontSize: 11,
         color: '#94A3B8',
         fontWeight: '500',
+    },
+    horizontalScrollContainer: {
+        flex: 1,
+        overflow: 'hidden',
+        cursor: 'grab',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+    },
+    horizontalBarsWrapper: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        paddingHorizontal: 10,
+        gap: 16,
+        minWidth: '100%',
+    },
+    scrollInstruction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 16,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: '#F1F5F9',
+        gap: 8,
+    },
+    scrollInstructionText: {
+        fontSize: 11,
+        color: '#94A3B8',
+        fontStyle: 'italic',
     },
 });

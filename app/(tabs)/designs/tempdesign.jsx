@@ -27,6 +27,18 @@ const formatDateStr = (date) => {
     return `${year}-${month}-${day}`;
 };
 
+// Helper function to format time for hover tooltip
+const formatTimeForHover = (date) => {
+    if (!date || isNaN(date.getTime())) return 'Invalid time';
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const minutesStr = minutes < 10 ? `0${minutes}` : minutes;
+    return `${hours}:${minutesStr} ${ampm}`;
+};
+
 // Custom Date Picker Component
 const CustomDatePicker = ({ visible, onClose, onSelectDate, currentDate, availableDates }) => {
     const currentDateObj = currentDate instanceof Date ? currentDate : new Date(currentDate);
@@ -259,7 +271,7 @@ const ClimateAnalytics = () => {
     // Get all high temperature records (temperature > 35°C)
     const getHighTempRecords = () => {
         return allData.filter(item => parseFloat(item.temperature) > 35)
-            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)); // Sort by newest first
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     };
 
     // Format time as HH:MM
@@ -282,10 +294,8 @@ const ClimateAnalytics = () => {
     // Handle click on a sensor log
     const handleLogPress = (item) => {
         const dateObj = new Date(item.created_at);
-        // Create date at noon to avoid timezone issues
         const newDate = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate(), 12, 0, 0);
         setSelectedDate(newDate);
-        // Close date picker if it's open
         setShowDatePicker(false);
     };
 
@@ -429,7 +439,8 @@ const ClimateAnalytics = () => {
             return { 
                 x: getCoordinateX(h, chartWidth), 
                 y: getYPos(d[key], maxVal),
-                value: parseFloat(d[key])
+                value: parseFloat(d[key]),
+                time: date
             };
         });
 
@@ -496,66 +507,88 @@ const ClimateAnalytics = () => {
                             </>
                         )}
 
-                        {points.map((point, index) => (
-                            <Circle 
-                                key={index}
-                                cx={point.x} 
-                                cy={point.y} 
-                                r={isVerySmall ? 2 : 2.5} 
-                                fill={color} 
-                                stroke="#FFF" 
-                                strokeWidth="1" 
-                            />
-                        ))}
-
-                        {currentHover && (
-                            <G>
-                                <Line 
-                                    x1={getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth)} 
-                                    y1={TOP_PADDING} 
-                                    x2={getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth)} 
-                                    y2={GRAPH_HEIGHT + TOP_PADDING} 
-                                    stroke={color} 
-                                    strokeWidth="0.8" 
-                                    strokeDasharray="3 2" 
-                                />
-                                <Circle 
-                                    cx={getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth)} 
-                                    cy={getYPos(currentHover[key], maxVal)} 
-                                    r={isVerySmall ? 3 : 4} 
-                                    fill={color} 
-                                    stroke="#FFF" 
-                                    strokeWidth="1.5" 
-                                />
-                                <Rect 
-                                    x={getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth) - 30} 
-                                    y={getYPos(currentHover[key], maxVal) - 35} 
-                                    width="60" 
-                                    height="28" 
-                                    rx="6" 
-                                    fill="#1E293B" 
-                                />
-                                <SvgText 
-                                    x={getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth)} 
-                                    y={getYPos(currentHover[key], maxVal) - 22} 
-                                    fill="#FFF" 
-                                    fontSize="9" 
-                                    fontWeight="800" 
-                                    textAnchor="middle"
-                                >
-                                    {parseFloat(currentHover[key]).toFixed(1)}{type === 'temp' ? '°C' : '%'}
-                                </SvgText>
-                                <SvgText 
-                                    x={getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth)} 
-                                    y={getYPos(currentHover[key], maxVal) - 12} 
-                                    fill="#94A3B8" 
-                                    fontSize="7" 
-                                    textAnchor="middle"
-                                >
-                                    {new Date(currentHover.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                </SvgText>
-                            </G>
-                        )}
+                        {currentHover && (() => {
+                            const hoverX = getCoordinateX(new Date(currentHover.created_at).getHours() + new Date(currentHover.created_at).getMinutes()/60, chartWidth);
+                            const hoverY = getYPos(currentHover[key], maxVal);
+                            const hoverValue = parseFloat(currentHover[key]).toFixed(1);
+                            const unit = type === 'temp' ? '°C' : '%';
+                            const formattedTime = formatTimeForHover(new Date(currentHover.created_at));
+                            
+                            // Tooltip dimensions
+                            const tooltipWidth = 85;
+                            const tooltipHeight = 35;
+                            
+                            // Calculate tooltip position - centered on the hover point
+                            let tooltipX = hoverX - (tooltipWidth / 2);
+                            let tooltipY = hoverY - tooltipHeight - 8;
+                            
+                            // Prevent cutting off on left side
+                            if (tooltipX < LEFT_MARGIN) {
+                                tooltipX = LEFT_MARGIN;
+                            }
+                            // Prevent cutting off on right side
+                            if (tooltipX + tooltipWidth > chartWidth - RIGHT_MARGIN) {
+                                tooltipX = chartWidth - RIGHT_MARGIN - tooltipWidth;
+                            }
+                            // Prevent cutting off at top
+                            if (tooltipY < TOP_PADDING) {
+                                tooltipY = TOP_PADDING + 5;
+                            }
+                            // Prevent cutting off at bottom (show tooltip above point if too low)
+                            if (tooltipY + tooltipHeight > GRAPH_HEIGHT + TOP_PADDING) {
+                                tooltipY = hoverY + 8;
+                            }
+                            
+                            return (
+                                <G>
+                                    <Line 
+                                        x1={hoverX} 
+                                        y1={TOP_PADDING} 
+                                        x2={hoverX} 
+                                        y2={GRAPH_HEIGHT + TOP_PADDING} 
+                                        stroke={color} 
+                                        strokeWidth="0.8" 
+                                        strokeDasharray="3 2" 
+                                    />
+                                    <Circle 
+                                        cx={hoverX} 
+                                        cy={hoverY} 
+                                        r={isVerySmall ? 3 : 4} 
+                                        fill={color} 
+                                        stroke="#FFF" 
+                                        strokeWidth="1.5" 
+                                    />
+                                    <Rect 
+                                        x={tooltipX}
+                                        y={tooltipY}
+                                        width={tooltipWidth}
+                                        height={tooltipHeight}
+                                        rx="6" 
+                                        fill="#1E293B" 
+                                        opacity="0.95"
+                                    />
+                                    <SvgText 
+                                        x={tooltipX + (tooltipWidth / 2)} 
+                                        y={tooltipY + 15} 
+                                        fill="#FFF" 
+                                        fontSize="10" 
+                                        fontWeight="800" 
+                                        textAnchor="middle"
+                                    >
+                                        {hoverValue}{unit}
+                                    </SvgText>
+                                    <SvgText 
+                                        x={tooltipX + (tooltipWidth / 2)} 
+                                        y={tooltipY + 28} 
+                                        fill="#94A3B8" 
+                                        fontSize="8" 
+                                        textAnchor="middle"
+                                    >
+                                        {formattedTime}
+                                    </SvgText>
+                                </G>
+                            );
+                        })()}
                     </Svg>
 
                     <View 

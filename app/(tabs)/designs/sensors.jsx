@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     badge: { backgroundColor: '#F0FDF4', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
     badgeInactive: { backgroundColor: '#FEF3C7' },
     badgeDisconnected: { backgroundColor: '#FEE2E2' },
-    badgeText: { fontSize: 10, fontWeight: '800' },
+    badgeText: { fontSize: 10, fontWeight: '800', color: '#10B981' },
     badgeTextActive: { color: '#10B981' },
     badgeTextInactive: { color: '#F59E0B' },
     badgeTextDisconnected: { color: '#EF4444' },

@@ -11,6 +11,7 @@ import {
   useWindowDimensions
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { NGROK_URL } from "../../../ngrok_camera";
 import { useUserNavigation } from '../UserNavigationContext';
 
 const SideNavigation = ({ animatedValue }) => {
@@ -19,10 +20,84 @@ const SideNavigation = ({ animatedValue }) => {
   const { activeTab, setActiveTab } = useUserNavigation();
   const [hoveredItem, setHoveredItem] = useState(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+  // State for notification badge
+  const [notificationCount, setNotificationCount] = useState(0);
+  
+  // State to track if sidebar is collapsed
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Helper function to check if a date is today
+  const formatDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Fetch Sensor Logs and Pest Logs to check for today's logs
+  const fetchTodayLogs = async () => {
+    try {
+      const today = new Date();
+      const todayStr = formatDateKey(today);
+      let totalNewLogs = 0;
+
+      // Fetch Sensor Logs
+      try {
+        const sensorResponse = await fetch(`${NGROK_URL}/api/getallsensorlogs`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        const sensorData = await sensorResponse.json();
+        
+        // Count today's sensor logs
+        const todaySensorLogs = sensorData.filter(log => {
+          const logDate = new Date(log.created_at);
+          return formatDateKey(logDate) === todayStr;
+        });
+        totalNewLogs += todaySensorLogs.length;
+      } catch (e) {
+        console.error("Sensor Logs Fetch Error:", e);
+      }
+
+      // Fetch Pest Logs
+      try {
+        const pestResponse = await fetch(`${NGROK_URL}/api/getallpestlogs`, {
+          headers: { 'ngrok-skip-browser-warning': 'true' }
+        });
+        const pestData = await pestResponse.json();
+        
+        // Count today's pest logs
+        const todayPestLogs = pestData.filter(log => {
+          const logDate = new Date(log.created_at);
+          return formatDateKey(logDate) === todayStr;
+        });
+        totalNewLogs += todayPestLogs.length;
+      } catch (e) {
+        console.error("Pest Logs Fetch Error:", e);
+      }
+
+      setNotificationCount(totalNewLogs);
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+    }
+  };
+
+  // Fetch logs when component mounts
+  useEffect(() => {
+    fetchTodayLogs();
+    
+    // Optional: Refresh every 30 seconds to check for new logs
+    const interval = setInterval(() => {
+      fetchTodayLogs();
+    }, 30000); // 30 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   // --- AUTO COLLAPSE LOGIC ---
   useEffect(() => {
     const shouldCollapse = width < 1000; 
+    setIsCollapsed(shouldCollapse);
     
     Animated.timing(animatedValue, {
       toValue: shouldCollapse ? 0 : 1,
@@ -48,6 +123,11 @@ const SideNavigation = ({ animatedValue }) => {
   const handleNavigation = (item) => {
     setActiveTab(item.label);
     router.push(item.path);
+    
+    // Reset notification count when navigating to Reports
+    if (item.label === 'Reports') {
+      setNotificationCount(0);
+    }
   };
 
   const handleLogout = () => {
@@ -82,6 +162,7 @@ const SideNavigation = ({ animatedValue }) => {
           {menuItems.map((item) => {
             const isActive = activeTab === item.label;
             const isHovered = hoveredItem === item.label;
+            const showBadge = item.label === 'Reports' && notificationCount > 0;
 
             return (
               <TouchableOpacity
@@ -102,6 +183,14 @@ const SideNavigation = ({ animatedValue }) => {
                     size={22} 
                     color={isActive ? '#10B981' : '#94A3B8'}
                   />
+                  {/* Badge on Icon when collapsed */}
+                  {showBadge && isCollapsed && (
+                    <View style={styles.badgeOnIcon}>
+                      <Text style={styles.badgeText}>
+                        {notificationCount > 99 ? '99+' : notificationCount}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Animated.Text 
@@ -114,6 +203,15 @@ const SideNavigation = ({ animatedValue }) => {
                 >
                   {item.label}
                 </Animated.Text>
+
+                {/* Badge on Text when expanded */}
+                {showBadge && !isCollapsed && (
+                  <View style={styles.badgeOnText}>
+                    <Text style={styles.badgeText}>
+                      {notificationCount > 99 ? '99+' : notificationCount}
+                    </Text>
+                  </View>
+                )}
                       
                 {isActive && <View style={styles.activeIndicator} />}
               </TouchableOpacity>
@@ -254,6 +352,7 @@ const styles = StyleSheet.create({
     width: 44,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
   navText: {
     fontSize: 15,
@@ -291,6 +390,57 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 15,
     marginLeft: 8,
+  },
+  
+  // Badge on Icon (when sidebar is collapsed - showing only icons)
+  badgeOnIcon: {
+    position: 'absolute',
+    top: -8,
+    right: 10,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  
+  // Badge on Text (when sidebar is expanded - showing icons + text)
+  badgeOnText: {
+    position: 'absolute',
+    top: -2,
+    right: -5,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    textAlign: 'center',
   },
   
   // Modal Styles

@@ -76,80 +76,57 @@ const isTimeInRange = (date, startHour, startMinute, endHour, endMinute) => {
     return timeInMinutes >= startInMinutes && timeInMinutes <= endInMinutes;
 };
 
-// Helper function to get data for a specific hour with fallback logic
+// Helper function to calculate total peppers (excluding reject)
+const calculateTotalPeppers = (data) => {
+    return (parseInt(data.unripe) || 0) + 
+           (parseInt(data['semi-ripe']) || 0) + 
+           (parseInt(data.ripe) || 0);
+};
+
+// Helper function to get data for a specific hour - FIXED: gets FIRST data in range
 const getDataForHour = (todayData, targetHour) => {
-    if (targetHour === 16) {
-        // First try: 4:00 PM to 4:39 PM
-        const primaryData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, 16, 0, 16, 39);
+    // Define exact time ranges for each hour
+    const hourRanges = {
+        7: { startHour: 7, startMinute: 0, endHour: 7, endMinute: 39 },
+        8: { startHour: 8, startMinute: 0, endHour: 8, endMinute: 39 },
+        9: { startHour: 9, startMinute: 0, endHour: 9, endMinute: 39 },
+        10: { startHour: 10, startMinute: 0, endHour: 10, endMinute: 39 },
+        11: { startHour: 11, startMinute: 0, endHour: 11, endMinute: 39 },
+        12: { startHour: 12, startMinute: 0, endHour: 12, endMinute: 39 },
+        13: { startHour: 13, startMinute: 0, endHour: 13, endMinute: 39 },
+        14: { startHour: 14, startMinute: 0, endHour: 14, endMinute: 39 },
+        15: { startHour: 15, startMinute: 0, endHour: 15, endMinute: 39 },
+        16: { startHour: 16, startMinute: 0, endHour: 16, endMinute: 39 },
+        17: { startHour: 17, startMinute: 0, endHour: 17, endMinute: 30 },
+    };
+    
+    const range = hourRanges[targetHour];
+    if (!range) return 0;
+    
+    // Filter data within the specific hour range
+    const hourData = todayData.filter(item => {
+        const date = new Date(item.created_at);
+        return isTimeInRange(date, 
+            range.startHour, range.startMinute,
+            range.endHour, range.endMinute
+        );
+    });
+    
+    if (hourData.length > 0) {
+        // Get the FIRST (earliest) data in this hour range
+        const firstData = hourData.reduce((earliest, current) => {
+            return new Date(current.created_at) < new Date(earliest.created_at) ? current : earliest;
         });
         
-        if (primaryData.length > 0) {
-            // Get the most recent data from primary range
-            const bestData = primaryData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
+        // Calculate total (unripe + semi-ripe + ripe) - EXCLUDING reject
+        const totalPeppers = calculateTotalPeppers(firstData);
         
-        // Second try: 4:00 PM to 3:40 PM (looking back to 3:40 PM)
-        const fallbackData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            // Check if time is between 3:40 PM and 4:00 PM
-            return isTimeInRange(date, 15, 40, 16, 0);
-        });
-        
-        if (fallbackData.length > 0) {
-            // Get the most recent data from fallback range
-            const bestData = fallbackData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-        
-        // No data found - return 0
-        return 0;
-    } else if (targetHour === 17) {
-        // For 5:00 PM, use range 4:40 PM to 5:30 PM
-        const data5PM = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            return isTimeInRange(date, 16, 40, 17, 30);
-        });
-        if (data5PM.length > 0) {
-            const bestData = data5PM.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-        return 0;
-    } else {
-        // For other hours, use standard hour range
-        const hourData = todayData.filter(item => {
-            const date = new Date(item.created_at);
-            const hours = date.getHours();
-            return hours === targetHour;
-        });
-        if (hourData.length > 0) {
-            const bestData = hourData.reduce((latest, current) => {
-                return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-            });
-            const total = (parseInt(bestData.unripe) || 0) + 
-                         (parseInt(bestData['semi-ripe']) || 0) + 
-                         (parseInt(bestData.ripe) || 0);
-            return total * 15;
-        }
-        return 0;
+        // Calculate revenue: total peppers * 15
+        return totalPeppers * 15;
     }
+    
+    // If no data, return 0 (bar won't show)
+    return 0;
 };
 
 // Get current week number
@@ -157,7 +134,137 @@ const getCurrentWeekNumber = () => {
     return getWeekNumber(new Date());
 };
 
-// Crop Health Bar Graph Component - With Smooth Animations
+// Horizontal Drag Scroll Component for Daily View
+const HorizontalDragScroll = ({ children, data, initialScrollToEnd = true }) => {
+    const scrollViewRef = useRef(null);
+    const [isLongPressing, setIsLongPressing] = useState(false);
+    const [dragStartX, setDragStartX] = useState(0);
+    const [scrollStartX, setScrollStartX] = useState(0);
+    const longPressTimer = useRef(null);
+    const [isInitialScrollDone, setIsInitialScrollDone] = useState(false);
+
+    const getScrollPosition = () => {
+        if (Platform.OS === 'web') {
+            const scrollViewNode = scrollViewRef.current;
+            if (scrollViewNode && scrollViewNode.scrollLeft !== undefined) {
+                return scrollViewNode.scrollLeft;
+            }
+        }
+        return scrollViewRef.current?.scrollResponder?.getScrollableNode()?.scrollLeft || 0;
+    };
+
+    const setScrollPosition = (x) => {
+        if (Platform.OS === 'web') {
+            const scrollViewNode = scrollViewRef.current;
+            if (scrollViewNode && scrollViewNode.scrollLeft !== undefined) {
+                scrollViewNode.scrollLeft = x;
+            }
+        } else {
+            scrollViewRef.current?.scrollTo({ x, animated: false });
+        }
+    };
+
+    // Scroll to end on initial load to show latest dates on the right
+    useEffect(() => {
+        if (!isInitialScrollDone && scrollViewRef.current && data && data.length > 0) {
+            setTimeout(() => {
+                if (Platform.OS === 'web') {
+                    const scrollViewNode = scrollViewRef.current;
+                    if (scrollViewNode && scrollViewNode.scrollWidth !== undefined) {
+                        scrollViewNode.scrollLeft = scrollViewNode.scrollWidth;
+                    }
+                } else {
+                    scrollViewRef.current?.scrollToEnd({ animated: false });
+                }
+                setIsInitialScrollDone(true);
+            }, 100);
+        }
+    }, [data, isInitialScrollDone]);
+
+    const handleDragStart = (clientX) => {
+        setDragStartX(clientX);
+        setScrollStartX(getScrollPosition());
+        
+        longPressTimer.current = setTimeout(() => {
+            setIsLongPressing(true);
+        }, 300);
+    };
+
+    const handleDragMove = (clientX) => {
+        if (!isLongPressing) return;
+        
+        const deltaX = clientX - dragStartX;
+        const newScrollX = scrollStartX - deltaX;
+        setScrollPosition(Math.max(0, newScrollX));
+    };
+
+    const handleDragEnd = () => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current);
+        }
+        setIsLongPressing(false);
+    };
+
+    const onMouseDown = (e) => {
+        e.preventDefault();
+        handleDragStart(e.clientX);
+    };
+
+    const onMouseMove = (e) => {
+        if (!isLongPressing) return;
+        handleDragMove(e.clientX);
+    };
+
+    const onMouseUp = () => {
+        handleDragEnd();
+    };
+
+    const onTouchStart = (e) => {
+        const touch = e.touches[0];
+        handleDragStart(touch.clientX);
+    };
+
+    const onTouchMove = (e) => {
+        if (!isLongPressing) return;
+        const touch = e.touches[0];
+        handleDragMove(touch.clientX);
+    };
+
+    const onTouchEnd = () => {
+        handleDragEnd();
+    };
+
+    const dragProps = Platform.OS === 'web' 
+        ? {
+            onMouseDown,
+            onMouseMove,
+            onMouseUp,
+            onMouseLeave: onMouseUp,
+          }
+        : {
+            onTouchStart,
+            onTouchMove,
+            onTouchEnd,
+            onTouchCancel: onTouchEnd,
+          };
+
+    return (
+        <View style={styles.horizontalScrollContainer}>
+            <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.horizontalBarsWrapper}
+                scrollEnabled={false}
+                {...dragProps}
+            >
+                {children}
+            </ScrollView>
+        </View>
+    );
+};
+
+// Crop Health Bar Graph Component - With Smooth Animations and Horizontal Scrolling for Daily View
 const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
     const [activeFilter, setActiveFilter] = useState('Today');
     const [showDropdown, setShowDropdown] = useState(false);
@@ -180,31 +287,7 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
             const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17];
             
             const result = hours.map(hour => {
-                let valueInPesos = 0;
-                
-                if (hour === 16) {
-                    // Special handling for 4:00 PM with fallback logic
-                    valueInPesos = getDataForHour(todayData, 16);
-                } else if (hour === 17) {
-                    // For 5:00 PM, use range 4:40 PM to 5:30 PM
-                    valueInPesos = getDataForHour(todayData, 17);
-                } else {
-                    // For other hours, use standard hour range
-                    const hourData = todayData.filter(item => {
-                        const date = new Date(item.created_at);
-                        const hours = date.getHours();
-                        return hours === hour;
-                    });
-                    if (hourData.length > 0) {
-                        const bestData = hourData.reduce((latest, current) => {
-                            return new Date(current.created_at) > new Date(latest.created_at) ? current : latest;
-                        });
-                        const total = (parseInt(bestData.unripe) || 0) + 
-                                     (parseInt(bestData['semi-ripe']) || 0) + 
-                                     (parseInt(bestData.ripe) || 0);
-                        valueInPesos = total * 15;
-                    }
-                }
+                let valueInPesos = getDataForHour(todayData, hour);
                 
                 let label = '';
                 if (hour === 7) label = '7AM';
@@ -260,10 +343,8 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                 }
             });
 
-            const datesWithData = Object.keys(dailyValues)
-                .sort()
-                .reverse()
-                .slice(0, isSmall ? 5 : 7);
+            // Sort dates in ascending order (oldest to newest) - SHOW ALL DATA
+            const datesWithData = Object.keys(dailyValues).sort();
             
             const result = datesWithData.map(dayKey => {
                 const date = new Date(dayKey);
@@ -278,13 +359,17 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                     fullDate: date,
                     hasData: modeValue > 0
                 };
-            }).reverse();
+            });
+
+            if (result.length === 0) {
+                return [];
+            }
 
             return result.map((item, index) => {
-                if (index === 0) return { ...item, highlight: true };
-                const prevValue = result[index - 1].value;
+                if (index === result.length - 1) return { ...item, highlight: true };
+                const nextValue = result[index + 1].value;
                 const currentValue = item.value;
-                const highlight = currentValue > prevValue;
+                const highlight = currentValue > nextValue;
                 return { ...item, highlight };
             });
         } else {
@@ -437,7 +522,7 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
     };
 
     // Responsive bar pill width
-    const barPillWidth = isSmall ? 11 : isMedium ? 14 : 19;
+    const barPillWidth = isSmall ? 11 : isMedium ? 15 : 15;
     const axisFontSize = isSmall ? 7 : isMedium ? 8 : 9;
     const labelFontSize = isSmall ? 6 : isMedium ? 7 : 8;
     const statFontSize = isSmall ? 10 : isMedium ? 11 : 12;
@@ -515,6 +600,97 @@ const CropHealthBarGraph = ({ allBellPepperData, windowWidth }) => {
                     <Icon name="calendar-blank" size={40} color="#CBD5E1" />
                     <Text style={styles.noDataText}>No data available for today</Text>
                     <Text style={styles.noDataSubtext}>No readings recorded between 7AM - 5PM</Text>
+                </View>
+            </View>
+        );
+    }
+
+    // For Daily view, use horizontal scrollable container to show ALL data
+    if (activeFilter === 'Daily') {
+        const maxValueForScaling = maxValue > 0 ? maxValue : 1000;
+        
+        return (
+            <View>
+                <View style={styles.cropHealthHeader}>
+                    <Text style={styles.cropHealthTitle}>Crop Health</Text>
+                    <View ref={dropdownRef}>
+                        <TouchableOpacity 
+                            style={styles.cropDropdownMini} 
+                            onPress={() => setShowDropdown(!showDropdown)}
+                        >
+                            <Text style={styles.cropDropdownText}>{activeFilter}</Text>
+                            <Icon name="chevron-down" size={14} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {showDropdown && (
+                            <View style={[styles.cropDropdownMenu, { right: isSmall ? -10 : 0 }]}>
+                                {['Today', 'Daily', 'Weekly'].map(f => (
+                                    <TouchableOpacity 
+                                        key={f} 
+                                        style={styles.cropDropdownItem} 
+                                        onPress={() => handleFilterChange(f)}
+                                    >
+                                        <Text style={[styles.cropDropdownItemText, activeFilter === f && {color: '#10B981'}]}>{f}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        )}
+                    </View>
+                </View>
+
+                <View style={styles.cropGraphContent}>
+                    <View style={[styles.cropYAxis, { width: isSmall ? 35 : isMedium ? 40 : 45 }]}>
+                        <Text style={[styles.cropAxisText, { fontSize: axisFontSize }]}>₱{maxValueForScaling.toLocaleString()}</Text>
+                        <Text style={[styles.cropAxisText, { fontSize: axisFontSize }]}>₱{Math.round(maxValueForScaling * 0.75).toLocaleString()}</Text>
+                        <Text style={[styles.cropAxisText, { fontSize: axisFontSize }]}>₱{Math.round(maxValueForScaling * 0.5).toLocaleString()}</Text>
+                        <Text style={[styles.cropAxisText, { fontSize: axisFontSize }]}>₱{Math.round(maxValueForScaling * 0.25).toLocaleString()}</Text>
+                        <Text style={[styles.cropAxisText, { fontSize: axisFontSize }]}>₱0</Text>
+                    </View>
+
+                    <View style={styles.cropBarsContainer}>
+                        <HorizontalDragScroll data={data} initialScrollToEnd={true}>
+                            {data.map((item, index) => {
+                                const heightPercent = (item.value / maxValueForScaling) * 87;
+                                const finalHeightPercent = Math.min(87, Math.max(heightPercent, item.value > 0 ? 4 : 0));
+                                
+                                return (
+                                    <View key={index} style={styles.cropBarColumnHorizontal}>
+                                        <View style={styles.cropBarWrapperHorizontal}>
+                                            <Animated.View 
+                                                style={[
+                                                    styles.cropBarPillHorizontal,
+                                                    {
+                                                        height: `${finalHeightPercent}%`,
+                                                        backgroundColor: item.highlight ? '#22C55E' : '#2D2D2D',
+                                                        width: barPillWidth
+                                                    }
+                                                ]} 
+                                            />
+                                        </View>
+                                        {item.value > 0 && !isSmall && (
+                                            <Text style={[styles.cropBarValue, { fontSize: labelFontSize }]}>₱{item.value.toLocaleString()}</Text>
+                                        )}
+                                        <Text style={[styles.cropXAxisText, { fontSize: labelFontSize }]}>{item.label}</Text>
+                                    </View>
+                                );
+                            })}
+                        </HorizontalDragScroll>
+                    </View>
+                </View>
+
+                <View style={styles.cropStatsRow}>
+                    <View style={styles.cropStatBox}>
+                        <Text style={[styles.cropStatValue, { fontSize: statFontSize }]}>₱{data.length > 0 ? data[data.length - 1]?.value || 0 : 0}</Text>
+                        <Text style={[styles.cropStatLabel, { fontSize: statLabelFontSize }]}>Latest</Text>
+                    </View>
+                    <View style={styles.cropStatBox}>
+                        <Text style={[styles.cropStatValue, { fontSize: statFontSize }]}>₱{data.length > 0 ? Math.max(...data.map(d => d.value)) : 0}</Text>
+                        <Text style={[styles.cropStatLabel, { fontSize: statLabelFontSize }]}>Highest</Text>
+                    </View>
+                    <View style={styles.cropStatBox}>
+                        <Text style={[styles.cropStatValue, { fontSize: statFontSize }]}>₱{data.length > 0 ? (data.reduce((sum, d) => sum + d.value, 0) / data.length).toFixed(0) : 0}</Text>
+                        <Text style={[styles.cropStatLabel, { fontSize: statLabelFontSize }]}>Average</Text>
+                    </View>
                 </View>
             </View>
         );
@@ -1197,17 +1373,7 @@ const Dashboard = () => {
                                         strokeLinejoin="round"
                                         strokeLinecap="round"
                                     />
-                                    {points.map((point, idx) => (
-                                        <Circle
-                                            key={idx}
-                                            cx={point.x}
-                                            cy={point.y}
-                                            r="3"
-                                            fill={color}
-                                            stroke="#FFF"
-                                            strokeWidth="1.5"
-                                        />
-                                    ))}
+                                    
                                 </>
                             )}
 
@@ -1773,6 +1939,39 @@ const styles = StyleSheet.create({
     livePulse: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
     titleWithIcon: { flexDirection: 'row', alignItems: 'center' },
     cameraFeed: { flex: 1, width: '100%', borderRadius: 12, backgroundColor: '#F1F5F9', minHeight: 150 },
+    
+    // Horizontal Scroll Styles
+    horizontalScrollContainer: {
+        flex: 1,
+        overflow: 'hidden',
+        cursor: 'grab',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+    },
+    horizontalBarsWrapper: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        paddingHorizontal: 10,
+        gap: 16,
+        minWidth: '100%',
+    },
+    cropBarColumnHorizontal: {
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        minWidth: 60,
+        marginHorizontal: 4,
+    },
+    cropBarWrapperHorizontal: {
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        height: 140,
+        minWidth: 40,
+    },
+    cropBarPillHorizontal: {
+        borderRadius: 50,
+        minHeight: 3,
+        alignSelf: 'center',
+    },
     
     // Crop Health Styles - FIXED bar height alignment
     cropHealthHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, position: 'relative', zIndex: 10 },
