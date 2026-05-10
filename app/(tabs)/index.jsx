@@ -68,19 +68,19 @@ const PhoneMockups = () => {
     <View style={styles.phoneMockupsContainer}>
       <View style={[styles.phonesWrapper, { height: isSmallScreen ? 250 : 360 }]}>
         <PhoneMockup
-          imageSource={require('../../appimages/dashboardapp.jpg')}
+          imageSource={require('../../appimages/image2.jpg')}
           rotation={isVerySmallScreen ? "8deg" : "15deg"}
           offsetX={isVerySmallScreen ? -30 : -60}
           offsetY={isVerySmallScreen ? -5 : -10}
         />
         <PhoneMockup
-          imageSource={require('../../appimages/image2.jpg')}
+          imageSource={require('../../appimages/image1.jpg')}
           rotation={isVerySmallScreen ? "-8deg" : "-15deg"}
           offsetX={isVerySmallScreen ? 30 : 60}
           offsetY={isVerySmallScreen ? -5 : -10}
         />
         <PhoneMockup
-          imageSource={require('../../appimages/image1.jpg')}
+          imageSource={require('../../appimages/dashboardapp.jpg')}
           rotation="0deg"
           offsetX={0}
           offsetY={0}

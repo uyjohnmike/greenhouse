@@ -86,7 +86,7 @@ const SideNavigation = ({ animatedValue }) => {
   useEffect(() => {
     fetchTodayLogs();
     
-    // Optional: Refresh every 30 seconds to check for new logs
+
     const interval = setInterval(() => {
       fetchTodayLogs();
     }, 30000); // 30 seconds
@@ -94,7 +94,7 @@ const SideNavigation = ({ animatedValue }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // --- AUTO COLLAPSE LOGIC ---
+
   useEffect(() => {
     const shouldCollapse = width < 1000; 
     setIsCollapsed(shouldCollapse);
@@ -117,6 +117,7 @@ const SideNavigation = ({ animatedValue }) => {
     { label: 'Plants', icon: 'sprout-outline', path: '../designs/plants' },
     { label: 'Reports', icon: 'chart-box-outline', path: '../designs/reports' },
     { label: 'Temperature', icon: 'thermometer', path: '../designs/tempdesign' },
+    { label: 'Piquillo Chat', icon: 'robot', path: '../designs/puquillochat' },
     { label: 'Profile', icon: 'account-circle-outline', path: '../designs/profile' },
   ];
 
@@ -124,7 +125,7 @@ const SideNavigation = ({ animatedValue }) => {
     setActiveTab(item.label);
     router.push(item.path);
     
-    // Reset notification count when navigating to Reports
+    
     if (item.label === 'Reports') {
       setNotificationCount(0);
     }
